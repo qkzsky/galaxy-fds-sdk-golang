@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"strings"
 	"bytes"
-	"cmd/go/testdata/src/vend/x/vendor/r"
 )
 
 const (
@@ -65,12 +64,8 @@ func NEWFDSClient(App_key, App_secret string) *FDSClient {
 
 func (c *FDSClient) Auth(auth FDSAuth) (*http.Response, error) {
 	client := &http.Client{}
-	var reader bytes.Reader = nil
-	if auth.Data != nil {
-		reader = bytes.NewReader(auth.Data)
-	}
-
-	req, _ := http.NewRequest(auth.Method, auth.Url, reader)
+	req, _ := http.NewRequest(auth.Method, auth.Url,
+		bytes.NewReader(auth.Data))
 	date, signature := Signature(c.App_key,
 		c.App_secret, req.Method, auth.Url,
 		auth.Content_Md5, auth.Content_Type)
@@ -303,7 +298,7 @@ func (c *FDSClient) List_Object(bucketname string) ([]string, error) {
 }
 
 // v1类型
-func (c *FDSClient) Post_Object(bucketname, data []byte, filetype string) (string, error) {
+func (c *FDSClient) Post_Object(bucketname string, data []byte, filetype string) (string, error) {
 	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname + DELIMITER
 	if !strings.HasPrefix(filetype, ".") {
 		filetype = "." + filetype
@@ -342,7 +337,8 @@ func (c *FDSClient) Post_Object(bucketname, data []byte, filetype string) (strin
 }
 
 // v2类型  自定义文件名 如果object已存在，将会覆盖
-func (c *FDSClient) Put_Object(bucketname, objectname, data []byte, filetype string) (bool, error) {
+func (c *FDSClient) Put_Object(bucketname string, objectname string,
+                               data []byte, filetype string) (bool, error) {
 	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname + DELIMITER + objectname
 	if !strings.HasPrefix(filetype, ".") {
 		filetype = "." + filetype
