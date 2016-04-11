@@ -264,15 +264,7 @@ func (c *FDSClient) Get_Object(bucketname, objectname string, position int64, si
 }
 
 // prefix需要改进
-func (c *FDSClient) List_Object(bucketname string) ([]string, error) {
-	return List_Ojbect(bucketname, "")
-}
-
-func (c *FDSClient) List_Object(bucketname, prefix string) ([]string, error) {
-	return List_Ojbect(bucketname, prefix, delimiter, DEFAULT_LIST_MAX_KEYS)
-}
-
-func (c *FDSClient) List_Ojbect(bucketname, prefix, delimiter string, maxKeys int) (FDSListObjectResult, error) {
+func (c *FDSClient) List_Object(bucketname, prefix, delimiter string, maxKeys int) (*Model.FDSObjectListing, error) {
 	listobject := []string{}
 	if delimiter == nil || len(delimiter) == 0 {
 		delimiter = DELIMITER
@@ -301,13 +293,8 @@ func (c *FDSClient) List_Ojbect(bucketname, prefix, delimiter string, maxKeys in
 		if err != nil {
 			return listobject, err
 		}
-		objects, _ := sj.Get("objects").Array()
-		for _, object := range objects {
-			// fmt.Printf("%v\n", object.(map[string]interface{})["name"])
-			object = object.(map[string]interface{})["name"]
-			listobject = append(listobject, object.(string))
-		}
-		return listobject, nil
+
+		return Model.NewFDSObjectListing(sj)
 	} else {
 		return listobject, errors.New(string(body))
 	}
@@ -642,7 +629,7 @@ func (c *FDSClient) Complete_Multipart_Upload(bucketname, objectname, uploadId s
 }
 
 
-func (c *FDSClient) Get_Object_Meta(bucketname, objectname string) (Model.FDSMetaData, error) {
+func (c *FDSClient) Get_Object_Meta(bucketname, objectname string) (*FDSMetaData, error) {
 	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname + DELIMITER + objectname + "?metadata"
 	auth := FDSAuth{
 		Url:          url,
@@ -667,7 +654,7 @@ func (c *FDSClient) Get_Object_Meta(bucketname, objectname string) (Model.FDSMet
 	if err != nil {
 		return nil, err
 	}
-	return Model.NewFDSMetaData(responseJson), err
+	return Model.NewFDSMetaData(responseJson), nil
 }
 
 // list_object_next
@@ -676,3 +663,5 @@ func (c *FDSClient) Get_Object_Meta(bucketname, objectname string) (Model.FDSMet
 // get_object_acl
 // generate_presigned_uri
 // generate_download_object_uri
+
+

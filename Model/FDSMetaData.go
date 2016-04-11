@@ -16,17 +16,17 @@ const (
 )
 
 type FDSMetaData struct {
-	rawValue *simplejson.Json
+	RawValue *simplejson.Json
 }
 
-func NewFDSMetaData(jsonValue *simplejson.Json) {
-	return FDSMetaData{
-		rawValue: jsonValue,
+func NewFDSMetaData(jsonValue *simplejson.Json) (*FDSMetaData){
+	return &FDSMetaData{
+		RawValue: jsonValue,
 	}
 }
 
 func (d *FDSMetaData) getContentEncoding() (string) {
-	contentEncoding, err := d.rawValue.Get(ContentEncoding).String()
+	contentEncoding, err := d.RawValue.Get(ContentEncoding).String()
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +34,7 @@ func (d *FDSMetaData) getContentEncoding() (string) {
 }
 
 func (d *FDSMetaData) getContentType() (string) {
-	contentType, err := d.rawValue.Get(ContentType).String()
+	contentType, err := d.RawValue.Get(ContentType).String()
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +42,7 @@ func (d *FDSMetaData) getContentType() (string) {
 }
 
 func (d *FDSMetaData) getCacheControl() (string) {
-	contentEncoding, err := d.rawValue.Get(CacheControl).String()
+	contentEncoding, err := d.RawValue.Get(CacheControl).String()
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func (d *FDSMetaData) getCacheControl() (string) {
 }
 
 func (d *FDSMetaData) getContentLength() (int64) {
-	contentLength, err := d.rawValue.Get(ContentLength).Int64()
+	contentLength, err := d.RawValue.Get(ContentLength).Int64()
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +58,7 @@ func (d *FDSMetaData) getContentLength() (int64) {
 }
 
 func (d *FDSMetaData) getContentMD5() (string) {
-	contentMD5, err := d.rawValue.Get(ContentMD5).String()
+	contentMD5, err := d.RawValue.Get(ContentMD5).String()
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func (d *FDSMetaData) getContentMD5() (string) {
 }
 
 func (d *FDSMetaData) gteLastChecked() (int64) {
-	lastChecked, err := d.rawValue.Get(LastChecked).Int64()
+	lastChecked, err := d.RawValue.Get(LastChecked).Int64()
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func (d *FDSMetaData) gteLastChecked() (int64) {
 }
 
 func (d *FDSMetaData) getLastModified() (int64) {
-	lastModified, err := d.rawValue.Get(LastModified).Int64()
+	lastModified, err := d.RawValue.Get(LastModified).Int64()
 	if err != nil {
 		return nil, err
 	}
@@ -82,11 +82,11 @@ func (d *FDSMetaData) getLastModified() (int64) {
 }
 
 func (d *FDSMetaData) getRawMetadata() (*simplejson.Json) {
-	return d.rawValue
+	return d.RawValue
 }
 
 func (d *FDSMetaData) getUploadTime() (int64) {
-	uploadTime, err := d.rawValue.Get(UploadTime).Int64()
+	uploadTime, err := d.RawValue.Get(UploadTime).Int64()
 	if err != nil {
 		return nil, err
 	}

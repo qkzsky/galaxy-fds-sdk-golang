@@ -1,4 +1,4 @@
-package Model
+package galaxy_fds_sdk_golang
 
 import "github.com/bitly/go-simplejson"
 
@@ -7,7 +7,7 @@ type Owner struct {
 	displayName string
 }
 
-func NewOwner(jsonValue simplejson.Json) (Owner, error){
+func NewOwner(jsonValue simplejson.Json) (*Owner, error){
 	id, err:= jsonValue.Get("id").String()
 	if err != nil {
 		return nil, err

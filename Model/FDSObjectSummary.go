@@ -3,13 +3,13 @@ package Model
 import "github.com/bitly/go-simplejson"
 
 type FDSObjectSummary struct {
-	bucketName string
-	objectName string
-	owner      Owner
-	size       int64
+	BucketName string
+	ObjectName string
+	Owner      Owner
+	Size       int64
 }
 
-func NewFDSObjectSummary(jsonValue simplejson.Json) (FDSObjectSummary, error) {
+func NewFDSObjectSummary(jsonValue simplejson.Json) (*FDSObjectSummary, error) {
 	bucketName, err := jsonValue.Get("bucketName").String()
 	if err != nil {
 		return nil, err
@@ -26,10 +26,10 @@ func NewFDSObjectSummary(jsonValue simplejson.Json) (FDSObjectSummary, error) {
 	if err != nil {
 		return nil, err
 	}
-	return FDSObjectSummary{
-		bucketName: bucketName,
-		objectName: objectName,
-		owner:      owner,
-		size:       size,
+	return &FDSObjectSummary{
+		BucketName: bucketName,
+		ObjectName: objectName,
+		Owner:      owner,
+		Size:       size,
 	}, nil
 }

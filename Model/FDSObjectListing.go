@@ -3,25 +3,24 @@ package Model
 import "github.com/bitly/go-simplejson"
 
 
+
 type FDSObjectListing struct {
-	bucketName string
-	prefix string
-	delimiter string
-	marker string
-	nextMarker string
-	maxKeys int
-	truncated bool
-	objectSummaries []FDSObjectSummary
-	commonPrefix []string
+	BucketName string
+	Prefix     string
+	Delimiter  string
+	Marker     string
+	NextMarker string
+	MaxKeys    int
+	Truncated  bool
 }
 
-func NewFDSObjectListing(jsonValue simplejson.Json) (FDSObjectListing, error) {
+func NewFDSObjectListing(jsonValue simplejson.Json) (*FDSObjectListing, error) {
 	objectSummaryArray, err := jsonValue.Get("objectSummaries").Array()
 	if err != nil {
 		return nil, err
 	}
 
-	objectSummaries := make([]FDSObjectSummary, len(objectSummaryArray))
+	objectSummaries := make([]*FDSObjectSummary, len(objectSummaryArray))
 	for idx, objectSummaryJson := range(objectSummaryArray) {
 		objectSummaries[idx], err = NewFDSObjectSummary(objectSummaryJson)
 		if err != nil {
@@ -61,15 +60,15 @@ func NewFDSObjectListing(jsonValue simplejson.Json) (FDSObjectListing, error) {
 	if err != nil {
 		return nil, err
 	}
-	return FDSObjectListing{
-		bucketName: bucketName,
-		prefix:     prefix,
-		delimiter:  delimiter,
-		marker:     marker,
-		nextMarker: nextMarker,
-		maxKeys:    maxKeys,
-		truncated:  truncated,
-		objectSummaries: objectSummaries,
-		commonPrefix: commonPrefix,
+	return &FDSObjectListing{
+		BucketName: bucketName,
+		Prefix:     prefix,
+		Delimiter:  delimiter,
+		Marker:     marker,
+		NextMarker: nextMarker,
+		MaxKeys:    maxKeys,
+		Truncated:  truncated,
+		ObjectSummaries: objectSummaries,
+		CommonPrefix: commonPrefix,
 	}, nil
 }
