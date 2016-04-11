@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"strings"
 	"bytes"
+	"github.com/Shenjiaqi/galaxy-fds-sdk-golang/Model"
 )
 
 const (
@@ -20,6 +21,7 @@ const (
 	DEFAULT_CDN_SERVICE_URI            = "http://cdn.fds.api.xiaomi.com/"
 	USER_DEFINED_METADATA_PREFIX       = "x-xiaomi-meta-"
 	DELIMITER                          = "/"
+	DEFAULT_LIST_MAX_KEYS              = 1000
 )
 
 // permission
@@ -263,8 +265,20 @@ func (c *FDSClient) Get_Object(bucketname, objectname string, position int64, si
 
 // prefix需要改进
 func (c *FDSClient) List_Object(bucketname string) ([]string, error) {
+	return List_Ojbect(bucketname, "")
+}
+
+func (c *FDSClient) List_Object(bucketname, prefix string) ([]string, error) {
+	return List_Ojbect(bucketname, prefix, delimiter, DEFAULT_LIST_MAX_KEYS)
+}
+
+func (c *FDSClient) List_Ojbect(bucketname, prefix, delimiter string, maxKeys int) (FDSListObjectResult, error) {
 	listobject := []string{}
-	url := DEFAULT_FDS_SERVICE_BASE_URI + bucketname + "?prefix=&delimiter=" + DELIMITER
+	if delimiter == nil || len(delimiter) == 0 {
+		delimiter = DELIMITER
+	}
+
+	url := DEFAULT_FDS_SERVICE_BASE_URI + bucketname + "?prefix=" + prefix + "&delimiter=" + delimiter + "&maxKeys=" + maxKeys
 	auth := FDSAuth{
 		Url:          url,
 		Method:       "GET",
@@ -628,7 +642,7 @@ func (c *FDSClient) Complete_Multipart_Upload(bucketname, objectname, uploadId s
 }
 
 
-func (c *FDSClient) Get_Object_Meta(bucketname, objectname string) (*sJson.Json, error) {
+func (c *FDSClient) Get_Object_Meta(bucketname, objectname string) (Model.FDSMetaData, error) {
 	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname + DELIMITER + objectname + "?metadata"
 	auth := FDSAuth{
 		Url:          url,
@@ -653,7 +667,7 @@ func (c *FDSClient) Get_Object_Meta(bucketname, objectname string) (*sJson.Json,
 	if err != nil {
 		return nil, err
 	}
-	return responseJson, err
+	return Model.NewFDSMetaData(responseJson), err
 }
 
 // list_object_next
