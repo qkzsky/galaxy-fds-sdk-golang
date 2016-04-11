@@ -221,15 +221,17 @@ func (c *FDSClient) Is_Object_Exists(bucketname, objectname string) (bool, error
 	}
 }
 
-func (c *FDSClient) Get_Object(bucketname, objectname string, postion, size int) (string, error) {
-	if postion < 0 {
+func (c *FDSClient) Get_Object(bucketname, objectname string, position int64, size int64) ([]byte, error) {
+	if position < 0 {
 		err := errors.New("Seek position should be no less than 0")
 		return "", err
 	}
 	url := DEFAULT_CDN_SERVICE_URI + bucketname + DELIMITER + objectname
 	headers := map[string]string{}
-	if postion > 0 {
-		headers["range"] = fmt.Sprintf("bytes=%d-", postion)
+	if position > 0 && size < 0 {
+		headers["range"] = fmt.Sprintf("bytes=%d-", position)
+	} else if position > 0 && size >= 0 {
+		headers["range"] = fmt.Sprintf("bytes=%d-%d", position, position + size - 1)
 	}
 	auth := FDSAuth{
 		Url:          url,
