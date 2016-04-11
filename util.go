@@ -3,7 +3,7 @@ package galaxy_fds_sdk_golang
 import (
 	// "crypto/md5"
 	"encoding/json"
-	"github.com/bitly/go-simplejson"
+	sJson "github.com/bitly/go-simplejson"
 	// "io"
 	"errors"
 	"fmt"
@@ -127,7 +127,7 @@ func (c *FDSClient) List_Bucket() ([]string, error) {
 		return bucketlist, err
 	}
 	if res.StatusCode == 200 {
-		sj, err := simplejson.NewJson(body)
+		sj, err := sJson.NewJson(body)
 		if err != nil {
 			return bucketlist, err
 		}
@@ -283,7 +283,7 @@ func (c *FDSClient) List_Object(bucketname string) ([]string, error) {
 		return listobject, err
 	}
 	if res.StatusCode == 200 {
-		sj, err := simplejson.NewJson(body)
+		sj, err := sJson.NewJson(body)
 		if err != nil {
 			return listobject, err
 		}
@@ -327,7 +327,7 @@ func (c *FDSClient) Post_Object(bucketname string, data []byte, filetype string)
 		return "", err
 	}
 	if res.StatusCode == 200 {
-		sj, err := simplejson.NewJson(body)
+		sj, err := sJson.NewJson(body)
 		if err != nil {
 			return "", err
 		}
@@ -531,10 +531,134 @@ func (c *FDSClient) Set_Public(bucketname, objectname string, disable_prefetch b
 	return true, nil
 }
 
+func (c *FDSClient) Init_MultiPart_Upload(bucketname, objectname string, filetype string) (*sJson.Json, error) {
+	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname + DELIMITER + objectname + "?uploads"
+	if !strings.HasPrefix(filetype, ".") {
+		filetype = "." + filetype
+	}
+	content_type := mime.TypeByExtension(filetype)
+	if content_type == "" {
+		content_type = "application/octet-stream"
+	}
+	auth := FDSAuth{
+		Url:          url,
+		Method:       "PUT",
+		Data:         nil,
+		Content_Md5:  "",
+		Content_Type: content_type,
+		Headers:      map[string]string{},
+	}
+	res, err := c.Auth(auth)
+	if err != nil {
+		return false, err
+	}
+	body, err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		return false, err
+	}
+	if res.StatusCode != 200 {
+		return false, errors.New(string(body))
+	}
+	responseJson, err := sJson.NewJson(body)
+	if err != nil {
+		return nil, err
+	}
+	return responseJson, err
+}
+
+func (c *FDSClient) Upload_Part(bucketname, objectname, uploadId string, partnumber int, data []byte) (*sJson.Json, error) {
+	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname + DELIMITER + objectname + "?uploadId=" + uploadId + "&partNumber=" + partnumber
+	auth := FDSAuth{
+		Url:          url,
+		Method:       "PUT",
+		Data:         data,
+		Content_Md5:  "",
+		Headers:      map[string]string{},
+	}
+	res, err := c.Auth(auth)
+	if err != nil {
+		return false, err
+	}
+	body, err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		return false, err
+	}
+	if res.StatusCode != 200 {
+		return false, errors.New(string(body))
+	}
+	responseJson, err := sJson.NewJson(body)
+	if err != nil {
+		return nil, err
+	}
+	return responseJson, err
+}
+
+func (c *FDSClient) Complete_Multipart_Upload(bucketname, objectname, uploadId string, uploadPartResultList *sJson.Json) (*Json.Json, error) {
+	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname + DELIMITER + objectname + "?uploadId=" + uploadId
+	uploadPartResultListByteArray, err := json.Marshal(*uploadPartResultList)
+	if err != nil {
+		return false, err
+	}
+	auth := FDSAuth{
+		Url:          url,
+		Method:       "PUT",
+		Data:         uploadPartResultListByteArray,
+		Content_Md5:  "",
+		Headers:      map[string]string{},
+	}
+	res, err := c.Auth(auth)
+	if err != nil {
+		return false, err
+	}
+	body, err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		return false, err
+	}
+	if res.StatusCode != 200 {
+		return false, errors.New(string(body))
+	}
+	responseJson, err := sJson.NewJson(body)
+	if err != nil {
+		return nil, err
+	}
+	return responseJson, err
+}
+
+
+func (c *FDSClient) Get_Object_Meta(bucketname, objectname string) (*sJson.Json, error) {
+	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname + DELIMITER + objectname + "?metadata"
+	auth := FDSAuth{
+		Url:          url,
+		Method:       "GET",
+		Data:         nil,
+		Content_Md5:  "",
+		Headers:      map[string]string{},
+	}
+	res, err := c.Auth(auth)
+	if err != nil {
+		return false, err
+	}
+	body, err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		return false, err
+	}
+	if res.StatusCode != 200 {
+		return false, errors.New(string(body))
+	}
+	responseJson, err := sJson.NewJson(body)
+	if err != nil {
+		return nil, err
+	}
+	return responseJson, err
+}
+
 // list_object_next
 // set_bucket_acl
 // get_bucket_acl
 // get_object_acl
-// get_object_metadata
 // generate_presigned_uri
 // generate_download_object_uri
