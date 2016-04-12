@@ -1,7 +1,9 @@
 package Model
 
 import (
-	"github.com/bitly/go-simplejson"
+	"encoding/json"
+	"errors"
+	"strconv"
 )
 
 const (
@@ -16,81 +18,83 @@ const (
 )
 
 type FDSMetaData struct {
-	RawValue *simplejson.Json
+	m        map[string]interface{}
+	RawData  []byte
 }
 
-func NewFDSMetaData(jsonValue *simplejson.Json) (*FDSMetaData){
-	return &FDSMetaData{
-		RawValue: jsonValue,
+func NewFDSMetaData(rawValue []byte) (*FDSMetaData, error){
+	var fdsMetaData FDSMetaData
+	err := json.Unmarshal(rawValue, &fdsMetaData.m)
+	if err != nil {
+		return err
 	}
+
+	fdsMetaData.RawData = rawValue
+	return &fdsMetaData, nil
+}
+
+func (d *FDSMetaData) GetKey(k string) (string, error) {
+	r, ok := d.m[k]
+	if !ok {
+		return nil, errors.New("No such meta: " + k)
+	}
+	r, ok = r.(string)
+	if !ok {
+		return nil, errors.New("Invalid type for: " + k)
+	}
+	return r, nil
 }
 
 func (d *FDSMetaData) GetContentEncoding() (string, error) {
-	contentEncoding, err := d.RawValue.Get(ContentEncoding).String()
-	if err != nil {
-		return nil, err
-	}
-	return contentEncoding, nil
+	return d.GetKey(ContentEncoding)
 }
 
 func (d *FDSMetaData) GetContentType() (string, error) {
-	contentType, err := d.RawValue.Get(ContentType).String()
-	if err != nil {
-		return nil, err
-	}
-	return contentType, nil
+	return d.GetKey(ContentType)
 }
 
 func (d *FDSMetaData) GetCacheControl() (string, error) {
-	contentEncoding, err := d.RawValue.Get(CacheControl).String()
-	if err != nil {
-		return nil, err
-	}
-	return contentEncoding, nil
+	return d.GetKey(CacheControl)
 }
 
 func (d *FDSMetaData) GetContentLength() (int64, error) {
-	contentLength, err := d.RawValue.Get(ContentLength).Int64()
+	s, err := d.GetKey(ContentLength)
 	if err != nil {
 		return nil, err
 	}
-	return contentLength, nil
+	return strconv.ParseInt(s, 10, 64)
 }
 
 func (d *FDSMetaData) GetContentMD5() (string, error) {
-	contentMD5, err := d.RawValue.Get(ContentMD5).String()
-	if err != nil {
-		return nil, err
-	}
-	return contentMD5, nil
+	return d.GetKey(ContentMD5)
 }
 
 func (d *FDSMetaData) GetLastChecked() (int64, error) {
-	lastChecked, err := d.RawValue.Get(LastChecked).Int64()
+	s, err := d.GetKey(LastChecked)
 	if err != nil {
 		return nil, err
 	}
-	return lastChecked, nil
+	return strconv.ParseInt(s, 10, 64)
 }
 
 func (d *FDSMetaData) GetLastModified() (int64, error) {
-	lastModified, err := d.RawValue.Get(LastModified).Int64()
+	s, err := d.GetKey(LastModified)
 	if err != nil {
 		return nil, err
 	}
-	return lastModified, nil
+	return strconv.ParseInt(s, 10, 64)
 }
 
-func (d *FDSMetaData) GetRawMetadata() (*simplejson.Json, err) {
-	return d.RawValue
+func (d *FDSMetaData) GetRawMetadata() ([]byte, error) {
+	return d.RawData
 }
 
 func (d *FDSMetaData) GetUploadTime() (int64, error) {
-	uploadTime, err := d.RawValue.Get(UploadTime).Int64()
+	s, err := d.GetKey(UploadTime)
 	if err != nil {
 		return nil, err
 	}
-	return uploadTime, nil
+	return strconv.ParseInt(s, 10, 64)
 }
 
 

@@ -1,35 +1,20 @@
 package Model
 
-import "github.com/bitly/go-simplejson"
+import "encoding/json"
 
 type FDSObjectSummary struct {
 	BucketName string
 	ObjectName string
 	Owner      Owner
 	Size       int64
+	rawJsonValue []byte
 }
 
-func NewFDSObjectSummary(jsonValue simplejson.Json) (*FDSObjectSummary, error) {
-	bucketName, err := jsonValue.Get("bucketName").String()
+func NewFDSObjectSummary(jsonValue json) (*FDSObjectSummary, error) {
+	var fdsObjectSummary FDSObjectSummary
+	err := json.Unmarshal(jsonValue, fdsObjectSummary)
 	if err != nil {
-		return nil, err
+		return nil
 	}
-	objectName, err := jsonValue.Get("objectName").String()
-	if err != nil {
-		return nil, err
-	}
-	owner, err      := NewOwner(jsonValue.Get("owner"))
-	if err != nil {
-		return nil, err
-	}
-	size, err       := jsonValue.Get("size").Int64()
-	if err != nil {
-		return nil, err
-	}
-	return &FDSObjectSummary{
-		BucketName: bucketName,
-		ObjectName: objectName,
-		Owner:      owner,
-		Size:       size,
-	}, nil
+	return &fdsObjectSummary, nil
 }

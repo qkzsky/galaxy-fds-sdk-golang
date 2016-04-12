@@ -292,12 +292,7 @@ func (c *FDSClient) List_Object(bucketname, prefix, delimiter string, maxKeys in
 		return listobject, err
 	}
 	if res.StatusCode == 200 {
-		sj, err := sJson.NewJson(body)
-		if err != nil {
-			return listobject, err
-		}
-
-		return Model.NewFDSObjectListing(sj)
+		return Model.NewFDSObjectListing(body)
 	} else {
 		return listobject, errors.New(string(body))
 	}
@@ -332,12 +327,7 @@ func (c *FDSClient) List_Next_Bacth_Of_Objects(previous *Model.FDSObjectListing)
 		return nil, err
 	}
 	if res.StatusCode == 200 {
-		sj, err := sJson.NewJson(body)
-		if err != nil {
-			return nil, err
-		}
-
-		return Model.NewFDSObjectListing(sj)
+		return Model.NewFDSObjectListing(body)
 	} else {
 		return nil, errors.New(string(body))
 	}
@@ -384,7 +374,7 @@ func (c *FDSClient) Post_Object(bucketname string, data []byte, filetype string)
 
 // v2类型  自定义文件名 如果object已存在，将会覆盖
 func (c *FDSClient) Put_Object(bucketname string, objectname string,
-                               data []byte, filetype string) (bool, error) {
+                               data []byte, filetype string) (*Model.PutObjectResult, error) {
 	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname + DELIMITER + objectname
 	if !strings.HasPrefix(filetype, ".") {
 		filetype = "." + filetype
@@ -408,12 +398,12 @@ func (c *FDSClient) Put_Object(bucketname string, objectname string,
 	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	if res.StatusCode == 200 {
-		return true, nil
+		return Model.NewPutObjectResult(body), nil
 	} else {
-		return false, errors.New(string(body))
+		return nil, errors.New(string(body))
 	}
 }
 
@@ -575,7 +565,7 @@ func (c *FDSClient) Set_Public(bucketname, objectname string, disable_prefetch b
 	return true, nil
 }
 
-func (c *FDSClient) Init_MultiPart_Upload(bucketname, objectname string, filetype string) (*sJson.Json, error) {
+func (c *FDSClient) Init_MultiPart_Upload(bucketname, objectname string, filetype string) (*Model.UploadPartResult, error) {
 	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname + DELIMITER + objectname + "?uploads"
 	if !strings.HasPrefix(filetype, ".") {
 		filetype = "." + filetype
@@ -604,14 +594,10 @@ func (c *FDSClient) Init_MultiPart_Upload(bucketname, objectname string, filetyp
 	if res.StatusCode != 200 {
 		return false, errors.New(string(body))
 	}
-	responseJson, err := sJson.NewJson(body)
-	if err != nil {
-		return nil, err
-	}
-	return responseJson, err
+	return Model.NewUploadPartResult(body)
 }
 
-func (c *FDSClient) Upload_Part(bucketname, objectname, uploadId string, partnumber int, data []byte) (*sJson.Json, error) {
+func (c *FDSClient) Upload_Part(bucketname, objectname, uploadId string, partnumber int, data []byte) (*Model.UploadPartResult, error) {
 	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname + DELIMITER + objectname + "?uploadId=" + uploadId + "&partNumber=" + partnumber
 	auth := FDSAuth{
 		Url:          url,
@@ -632,16 +618,15 @@ func (c *FDSClient) Upload_Part(bucketname, objectname, uploadId string, partnum
 	if res.StatusCode != 200 {
 		return false, errors.New(string(body))
 	}
-	responseJson, err := sJson.NewJson(body)
-	if err != nil {
-		return nil, err
-	}
-	return responseJson, err
+	return Model.NewUploadPartResult(body)
 }
 
-func (c *FDSClient) Complete_Multipart_Upload(bucketname, objectname, uploadId string, uploadPartResultList *sJson.Json) (*sJson.Json, error) {
+func (c *FDSClient) Complete_Multipart_Upload(initPartuploadResult *Model.InitMultipartUploadResult, uploadPartResultList []Model.UploadPartResult) (*Model.PutObjectResult, error) {
+	bucketName = initPartuploadResult.BucketName
+	objectName = initPartuploadResult.ObjectName
+	uploadId = initPartuploadResult.UploadId
 	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname + DELIMITER + objectname + "?uploadId=" + uploadId
-	uploadPartResultListByteArray, err := json.Marshal(*uploadPartResultList)
+	uploadPartResultListByteArray, err := json.Marshal(uploadPartResultList)
 	if err != nil {
 		return false, err
 	}
@@ -664,11 +649,7 @@ func (c *FDSClient) Complete_Multipart_Upload(bucketname, objectname, uploadId s
 	if res.StatusCode != 200 {
 		return false, errors.New(string(body))
 	}
-	responseJson, err := sJson.NewJson(body)
-	if err != nil {
-		return nil, err
-	}
-	return responseJson, err
+	return Model.NewPutObjectResult(body)
 }
 
 
@@ -693,11 +674,7 @@ func (c *FDSClient) Get_Object_Meta(bucketname, objectname string) (*Model.FDSMe
 	if res.StatusCode != 200 {
 		return false, errors.New(string(body))
 	}
-	responseJson, err := sJson.NewJson(body)
-	if err != nil {
-		return nil, err
-	}
-	return Model.NewFDSMetaData(responseJson), nil
+	return Model.NewFDSMetaData(body)
 }
 
 func (c *FDSClient) Generate_Presigned_URI(bucketname, objectname, method string, expiration int64) (string, error) {

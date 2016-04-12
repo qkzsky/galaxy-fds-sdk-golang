@@ -1,32 +1,47 @@
 package Model
 
-import "github.com/bitly/go-simplejson"
+import "encoding/json"
+
+type InitMultipartUploadResult struct {
+	BucketName string
+	ObjectName string
+	UploadId   string
+	rawJsonValue []byte
+}
+
+func NewInitMultipartUploadResult (jsonValue []byte) (*InitMultipartUploadResult, error){
+
+	var initMultipartUploadResult InitMultipartUploadResult
+	err := json.Unmarshal(initMultipartUploadResult, jsonValue)
+	if err != nil {
+		return nil, err
+	}
+	initMultipartUploadResult.rawJsonValue = jsonValue
+	return initMultipartUploadResult, nil
+}
+
+type UploadPartList struct {
+	uploadPartResultList []UploadPartResult
+}
+
+func (u *UploadPartList) AddUploadPartResult(i *UploadPartResult) {
+	append(u.uploadPartResultList, *i)
+}
 
 type UploadPartResult struct {
 	PartNumber int
 	Etag       string
 	PartSize   int64
-	InternalValue *simplejson.Json
+	rawJsonValue []byte
 }
 
-func NewUploadPartResult(jsonVal simplejson.Json) (*UploadPartResult, error) {
-	partNumber, err := jsonVal.Get("partNumber").Int()
+func NewUploadPartResult(jsonValue []byte) (*UploadPartResult, error) {
+	var uploadPartResult UploadPartResult
+	err := json.Unmarshal(uploadPartResult, jsonValue)
 	if err != nil {
 		return nil, err
 	}
-	etag, err := jsonVal.Get("etag").String()
-	if err != nil {
-		return nil, err
-	}
-	partSize, err := jsonVal.Get("partSize").Int64()
-	if err != nil {
-		return nil, err
-	}
+	uploadPartResult.rawJsonValue = jsonValue
 
-	return &UploadPartResult{
-		PartNumber:    partNumber,
-		Etag:          etag,
-		PartSize:      partSize,
-		InternalValue: &jsonVal,
-	}
+	return &uploadPartResult, nil
 }
