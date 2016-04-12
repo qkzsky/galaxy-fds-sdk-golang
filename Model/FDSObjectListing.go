@@ -12,6 +12,9 @@ type FDSObjectListing struct {
 	NextMarker string
 	MaxKeys    int
 	Truncated  bool
+	ObjectSummaries []*FDSObjectSummary
+	CommonPrefixes  []string
+	InternalValue *simplejson.Json
 }
 
 func NewFDSObjectListing(jsonValue simplejson.Json) (*FDSObjectListing, error) {
@@ -56,7 +59,7 @@ func NewFDSObjectListing(jsonValue simplejson.Json) (*FDSObjectListing, error) {
 	if err != nil {
 		return nil, err
 	}
-	commonPrefix, err := jsonValue.Get("commonPrefix").StringArray()
+	commonPrefix, err := jsonValue.Get("commonPrefixes").StringArray()
 	if err != nil {
 		return nil, err
 	}
@@ -70,5 +73,6 @@ func NewFDSObjectListing(jsonValue simplejson.Json) (*FDSObjectListing, error) {
 		Truncated:  truncated,
 		ObjectSummaries: objectSummaries,
 		CommonPrefix: commonPrefix,
+		InternalValue: &jsonValue,
 	}, nil
 }

@@ -10,10 +10,23 @@ import (
 	"time"
 )
 
-func Signature(app_key, app_secret, method, u, content_md5, content_type string) (string, string) {
+func getDateFromUrl(urlStr string) string {
+	date := time.Now().Format(time.RFC1123)
+	queryParams, err := url.ParseQuery(urlStr)
+	if err != nil {
+		return date
+	}
+	d, ok := queryParams["Expires"]
+	if !ok {
+		return date
+	}
+	return string(d)
+}
+
+func Signature(app_secret, method, u, content_md5, content_type string) (string, error) {
 	var string_to_sign string
 	var uri string
-	date := time.Now().Format(time.RFC1123)
+	date := getDateFromUrl
 	string_to_sign += method + "\n"
 	string_to_sign += content_md5 + "\n"
 	string_to_sign += content_type + "\n"
@@ -34,5 +47,5 @@ func Signature(app_key, app_secret, method, u, content_md5, content_type string)
 	h := hmac.New(sha1.New, []byte(app_secret))
 	h.Write([]byte(string_to_sign))
 	b := base64.StdEncoding.EncodeToString(h.Sum(nil))
-	return date, fmt.Sprintf("Galaxy-V2 %s:%s", app_key, b)
+	return b
 }
