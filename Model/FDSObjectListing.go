@@ -15,7 +15,7 @@ type FDSObjectListing struct {
 	rawJsonValue    []byte
 }
 
-func NewFDSObjectListing(jsonValue json) (*FDSObjectListing, error) {
+func NewFDSObjectListing(jsonValue []byte) (*FDSObjectListing, error) {
 	var fdsObjectListing FDSObjectListing
 	err := json.Unmarshal(jsonValue, &fdsObjectListing)
 	if err != nil {

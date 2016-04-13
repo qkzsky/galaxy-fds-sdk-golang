@@ -1,10 +1,8 @@
 package Model
 
 import (
-	"encoding/json"
 	"errors"
 	"strconv"
-	"fmt"
 )
 
 const (
@@ -19,31 +17,24 @@ const (
 )
 
 type FDSMetaData struct {
-	m        map[string]interface{}
-	RawData  []byte
+	m        map[string][]string
 }
 
-func NewFDSMetaData(rawValue []byte) (*FDSMetaData, error){
+func NewFDSMetaData(rawValue map[string][]string) (*FDSMetaData){
 	var fdsMetaData FDSMetaData
-	err := json.Unmarshal(rawValue, &fdsMetaData.m)
-	if err != nil {
-		return err
-	}
-
-	fdsMetaData.RawData = rawValue
-	return &fdsMetaData, nil
+	fdsMetaData.m = rawValue
+	return &fdsMetaData
 }
 
 func (d *FDSMetaData) GetKey(k string) (string, error) {
 	r, ok := d.m[k]
 	if !ok {
-		return nil, errors.New("No such meta: " + k)
+		return "", errors.New("No such meta: " + k)
 	}
-	r, ok = r.(string)
-	if !ok {
-		return nil, errors.New("Invalid type for: " + k + ", expect string, got: " + fmt.Sprint("%d",r))
+	if len(r) == 0 {
+		return "", nil
 	}
-	return r, nil
+	return r[0], nil
 }
 
 func (d *FDSMetaData) GetContentEncoding() (string, error) {
@@ -61,7 +52,7 @@ func (d *FDSMetaData) GetCacheControl() (string, error) {
 func (d *FDSMetaData) GetContentLength() (int64, error) {
 	s, err := d.GetKey(ContentLength)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 	return strconv.ParseInt(s, 10, 64)
 }
@@ -73,7 +64,7 @@ func (d *FDSMetaData) GetContentMD5() (string, error) {
 func (d *FDSMetaData) GetLastChecked() (int64, error) {
 	s, err := d.GetKey(LastChecked)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 	return strconv.ParseInt(s, 10, 64)
 }
@@ -81,19 +72,19 @@ func (d *FDSMetaData) GetLastChecked() (int64, error) {
 func (d *FDSMetaData) GetLastModified() (int64, error) {
 	s, err := d.GetKey(LastModified)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 	return strconv.ParseInt(s, 10, 64)
 }
 
-func (d *FDSMetaData) GetRawMetadata() ([]byte, error) {
-	return d.RawData
+func (d *FDSMetaData) GetRawMetadata() (map[string][]string, error) {
+	return d.m, nil
 }
 
 func (d *FDSMetaData) GetUploadTime() (int64, error) {
 	s, err := d.GetKey(UploadTime)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 	return strconv.ParseInt(s, 10, 64)
 }

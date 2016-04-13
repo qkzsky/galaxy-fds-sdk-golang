@@ -13,6 +13,7 @@ import (
 	"strings"
 	"bytes"
 	"github.com/Shenjiaqi/galaxy-fds-sdk-golang/Model"
+	"time"
 )
 
 const (
@@ -71,14 +72,14 @@ func (c *FDSClient) Auth(auth FDSAuth) (*http.Response, error) {
 	client := &http.Client{}
 	req, _ := http.NewRequest(auth.Method, auth.Url,
 		bytes.NewReader(auth.Data))
-	date, signature := Signature(
+	signature := Signature(
 		c.App_secret, req.Method, auth.Url,
 		auth.Content_Md5, auth.Content_Type)
 	for k, v := range auth.Headers {
 		req.Header.Add(k, v)
 	}
 	req.Header.Add("authorization", fmt.Sprintf("Galaxy-V2 %s:%s", c.App_key, signature))
-	req.Header.Add("date", date)
+	req.Header.Add("date", time.Now().Format(time.RFC1123))
 	req.Header.Add("content-md5", auth.Content_Md5)
 	req.Header.Add("content-type", auth.Content_Type)
 	res, err := client.Do(req)
@@ -226,10 +227,10 @@ func (c *FDSClient) Is_Object_Exists(bucketname, objectname string) (bool, error
 	}
 }
 
-func (c *FDSClient) Get_Object(bucketname, objectname string, position int64, size int64) ([]byte, error) {
+func (c *FDSClient) Get_Object(bucketname, objectname string, position int64, size int64) (*Model.FDSObject, error) {
 	if position < 0 {
 		err := errors.New("Seek position should be no less than 0")
-		return "", err
+		return nil, err
 	}
 	url := DEFAULT_CDN_SERVICE_URI + bucketname + DELIMITER + objectname
 	headers := map[string]string{}
@@ -248,32 +249,33 @@ func (c *FDSClient) Get_Object(bucketname, objectname string, position int64, si
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if res.StatusCode == http.StatusOK || res.StatusCode == http.StatusPartialContent {
-		content := string(body)
-		if len(content) > size {
-			content = content[0:size]
-		}
-		return content, nil
+		return &Model.FDSObject{
+			BucketName: bucketname,
+			ObjectName: objectname,
+			Metadata:   *Model.NewFDSMetaData(res.Header),
+			ObjectContent: body,
+		}, nil
 	} else {
-		return "", errors.New(string(body))
+		return nil, errors.New(string(body))
 	}
 }
 
 // prefix需要改进
 func (c *FDSClient) List_Object(bucketname, prefix, delimiter string, maxKeys int) (*Model.FDSObjectListing, error) {
-	listobject := []string{}
-	if delimiter == nil || len(delimiter) == 0 {
+	if len(delimiter) == 0 {
 		delimiter = DELIMITER
 	}
 
-	url := DEFAULT_FDS_SERVICE_BASE_URI + bucketname + "?prefix=" + prefix + "&delimiter=" + delimiter + "&maxKeys=" + maxKeys
+	url := DEFAULT_FDS_SERVICE_BASE_URI + bucketname + "?prefix=" + prefix +
+	"&delimiter=" + delimiter + "&maxKeys=" + fmt.Sprintf("%d", maxKeys)
 	auth := FDSAuth{
 		Url:          url,
 		Method:       "GET",
@@ -284,17 +286,17 @@ func (c *FDSClient) List_Object(bucketname, prefix, delimiter string, maxKeys in
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
-		return listobject, err
+		return nil, err
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
-		return listobject, err
+		return nil, err
 	}
 	if res.StatusCode == 200 {
 		return Model.NewFDSObjectListing(body)
 	} else {
-		return listobject, errors.New(string(body))
+		return nil, errors.New(string(body))
 	}
 }
 
@@ -307,7 +309,9 @@ func (c *FDSClient) List_Next_Batch_Of_Objects(previous *Model.FDSObjectListing)
 	delimiter := previous.Delimiter
 	marker := previous.Marker
 	maxKeys := previous.MaxKeys
-	url := DEFAULT_FDS_SERVICE_BASE_URI + bucketName + "?prefix=" + prefix + "&delimiter=" + delimiter + "&maxKeys=" + maxKeys + "&marker=" + marker
+	url := DEFAULT_FDS_SERVICE_BASE_URI + bucketName + "?prefix=" + prefix +
+	"&delimiter=" + delimiter + "&maxKeys=" + fmt.Sprintf("%d", maxKeys) +
+	"&marker=" + marker
 
 	auth := FDSAuth{
 		Url:          url,
@@ -393,7 +397,7 @@ func (c *FDSClient) Put_Object(bucketname string, objectname string,
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
@@ -584,21 +588,23 @@ func (c *FDSClient) Init_MultiPart_Upload(bucketname, objectname string, filetyp
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	if res.StatusCode != 200 {
-		return false, errors.New(string(body))
+		return nil, errors.New(string(body))
 	}
 	return Model.NewUploadPartResult(body)
 }
 
 func (c *FDSClient) Upload_Part(bucketname, objectname, uploadId string, partnumber int, data []byte) (*Model.UploadPartResult, error) {
-	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname + DELIMITER + objectname + "?uploadId=" + uploadId + "&partNumber=" + partnumber
+	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname + DELIMITER +
+	objectname + "?uploadId=" + uploadId + "&partNumber=" +
+	fmt.Sprintf("%d", partnumber)
 	auth := FDSAuth{
 		Url:          url,
 		Method:       "PUT",
@@ -608,15 +614,15 @@ func (c *FDSClient) Upload_Part(bucketname, objectname, uploadId string, partnum
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	if res.StatusCode != 200 {
-		return false, errors.New(string(body))
+		return nil, errors.New(string(body))
 	}
 	return Model.NewUploadPartResult(body)
 }
@@ -628,7 +634,7 @@ func (c *FDSClient) Complete_Multipart_Upload(initPartuploadResult *Model.InitMu
 	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketName + DELIMITER + objectName + "?uploadId=" + uploadId
 	uploadPartResultListByteArray, err := json.Marshal(uploadPartResultList)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	auth := FDSAuth{
 		Url:          url,
@@ -639,23 +645,23 @@ func (c *FDSClient) Complete_Multipart_Upload(initPartuploadResult *Model.InitMu
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	if res.StatusCode != 200 {
-		return false, errors.New(string(body))
+		return nil, errors.New(string(body))
 	}
 	return Model.NewPutObjectResult(body)
 }
 
 
 func (c *FDSClient) Get_Object_Meta(bucketname, objectname string) (*Model.FDSMetaData, error) {
-	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname
-	+ DELIMITER + objectname + "?metadata"
+	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname +
+	DELIMITER + objectname + "?metadata"
 	auth := FDSAuth{
 		Url:          url,
 		Method:       "GET",
@@ -665,30 +671,27 @@ func (c *FDSClient) Get_Object_Meta(bucketname, objectname string) (*Model.FDSMe
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	if res.StatusCode != 200 {
-		return false, errors.New(string(body))
+		return nil, errors.New(string(body))
 	}
-	return Model.NewFDSMetaData(body)
+	return Model.NewFDSMetaData(res.Header), nil
 }
 
 func (c *FDSClient) Generate_Presigned_URI(bucketname, objectname, method string,
 expiration int64) (string, error) {
 	expirationStr := fmt.Sprintf("%d", expiration)
-	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname + DELIMITER
-	+ objectname + "?" + GALAXY_ACCESS_KEY_ID + "=" + c.App_key + "&"
-	+ EXPIRES + "=" + expirationStr + "&"
-	signature, err := Signature(c.App_key, method, url, "", "")
-	if err != nil {
-		return nil, err
-	}
-	return url + SIGNATURE + "=" + signature
+	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname + DELIMITER +
+	objectname + "?" + GALAXY_ACCESS_KEY_ID + "=" + c.App_key + "&" +
+	EXPIRES + "=" + expirationStr + "&"
+	signature := Signature(c.App_key, method, url, "", "")
+	return url + SIGNATURE + "=" + signature, nil
 }
 
 // list_object_next

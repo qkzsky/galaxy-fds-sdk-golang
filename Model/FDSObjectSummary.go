@@ -16,11 +16,11 @@ type FDSObjectSummary struct {
 	rawJsonValue []byte
 }
 
-func NewFDSObjectSummary(jsonValue json) (*FDSObjectSummary, error) {
+func NewFDSObjectSummary(jsonValue []byte) (*FDSObjectSummary, error) {
 	var fdsObjectSummary FDSObjectSummary
 	err := json.Unmarshal(jsonValue, &fdsObjectSummary)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	return &fdsObjectSummary, nil
 }

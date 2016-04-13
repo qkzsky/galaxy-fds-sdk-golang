@@ -4,7 +4,6 @@ import (
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/base64"
-	"fmt"
 	"net/url"
 	"strings"
 	"time"
@@ -20,17 +19,16 @@ func getDateFromUrl(urlStr string) string {
 	if !ok {
 		return date
 	}
-	d, ok = d.(string)
-	if !ok {
-		return date
+	if len(d) == 0 {
+		return ""
 	}
-	return d
+	return d[0]
 }
 
-func Signature(app_secret, method, u, content_md5, content_type string) (string, error) {
+func Signature(app_secret, method, u, content_md5, content_type string) (string) {
 	var string_to_sign string
 	var uri string
-	date := getDateFromUrl
+	date := getDateFromUrl(u)
 	string_to_sign += method + "\n"
 	string_to_sign += content_md5 + "\n"
 	string_to_sign += content_type + "\n"
