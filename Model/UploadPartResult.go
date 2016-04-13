@@ -37,7 +37,7 @@ type UploadPartResult struct {
 
 func NewUploadPartResult(jsonValue []byte) (*UploadPartResult, error) {
 	var uploadPartResult UploadPartResult
-	err := json.Unmarshal(uploadPartResult, jsonValue)
+	err := json.Unmarshal(jsonValue, &uploadPartResult)
 	if err != nil {
 		return nil, err
 	}

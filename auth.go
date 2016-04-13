@@ -20,7 +20,11 @@ func getDateFromUrl(urlStr string) string {
 	if !ok {
 		return date
 	}
-	return string(d)
+	d, ok = d.(string)
+	if !ok {
+		return date
+	}
+	return d
 }
 
 func Signature(app_secret, method, u, content_md5, content_type string) (string, error) {

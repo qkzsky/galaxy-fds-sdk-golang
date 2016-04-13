@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strconv"
+	"fmt"
 )
 
 const (
@@ -40,7 +41,7 @@ func (d *FDSMetaData) GetKey(k string) (string, error) {
 	}
 	r, ok = r.(string)
 	if !ok {
-		return nil, errors.New("Invalid type for: " + k)
+		return nil, errors.New("Invalid type for: " + k + ", expect string, got: " + fmt.Sprint("%d",r))
 	}
 	return r, nil
 }
@@ -96,5 +97,3 @@ func (d *FDSMetaData) GetUploadTime() (int64, error) {
 	}
 	return strconv.ParseInt(s, 10, 64)
 }
-
-

@@ -298,7 +298,7 @@ func (c *FDSClient) List_Object(bucketname, prefix, delimiter string, maxKeys in
 	}
 }
 
-func (c *FDSClient) List_Next_Bacth_Of_Objects(previous *Model.FDSObjectListing) (*Model.FDSObjectListing, error) {
+func (c *FDSClient) List_Next_Batch_Of_Objects(previous *Model.FDSObjectListing) (*Model.FDSObjectListing, error) {
 	if !previous.Truncated {
 		return nil, errors.New("No more objects")
 	}
@@ -401,7 +401,7 @@ func (c *FDSClient) Put_Object(bucketname string, objectname string,
 		return nil, err
 	}
 	if res.StatusCode == 200 {
-		return Model.NewPutObjectResult(body), nil
+		return Model.NewPutObjectResult(body)
 	} else {
 		return nil, errors.New(string(body))
 	}
@@ -621,11 +621,11 @@ func (c *FDSClient) Upload_Part(bucketname, objectname, uploadId string, partnum
 	return Model.NewUploadPartResult(body)
 }
 
-func (c *FDSClient) Complete_Multipart_Upload(initPartuploadResult *Model.InitMultipartUploadResult, uploadPartResultList []Model.UploadPartResult) (*Model.PutObjectResult, error) {
-	bucketName = initPartuploadResult.BucketName
-	objectName = initPartuploadResult.ObjectName
-	uploadId = initPartuploadResult.UploadId
-	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname + DELIMITER + objectname + "?uploadId=" + uploadId
+func (c *FDSClient) Complete_Multipart_Upload(initPartuploadResult *Model.InitMultipartUploadResult, uploadPartResultList Model.UploadPartList) (*Model.PutObjectResult, error) {
+	bucketName := initPartuploadResult.BucketName
+	objectName := initPartuploadResult.ObjectName
+	uploadId := initPartuploadResult.UploadId
+	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketName + DELIMITER + objectName + "?uploadId=" + uploadId
 	uploadPartResultListByteArray, err := json.Marshal(uploadPartResultList)
 	if err != nil {
 		return false, err
@@ -654,7 +654,8 @@ func (c *FDSClient) Complete_Multipart_Upload(initPartuploadResult *Model.InitMu
 
 
 func (c *FDSClient) Get_Object_Meta(bucketname, objectname string) (*Model.FDSMetaData, error) {
-	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname + DELIMITER + objectname + "?metadata"
+	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname
+	+ DELIMITER + objectname + "?metadata"
 	auth := FDSAuth{
 		Url:          url,
 		Method:       "GET",
@@ -677,9 +678,12 @@ func (c *FDSClient) Get_Object_Meta(bucketname, objectname string) (*Model.FDSMe
 	return Model.NewFDSMetaData(body)
 }
 
-func (c *FDSClient) Generate_Presigned_URI(bucketname, objectname, method string, expiration int64) (string, error) {
+func (c *FDSClient) Generate_Presigned_URI(bucketname, objectname, method string,
+expiration int64) (string, error) {
 	expirationStr := fmt.Sprintf("%d", expiration)
-	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname + DELIMITER + objectname + "?" + GALAXY_ACCESS_KEY_ID + "=" + c.App_key + "&" + EXPIRES + "=" + expirationStr + "&"
+	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname + DELIMITER
+	+ objectname + "?" + GALAXY_ACCESS_KEY_ID + "=" + c.App_key + "&"
+	+ EXPIRES + "=" + expirationStr + "&"
 	signature, err := Signature(c.App_key, method, url, "", "")
 	if err != nil {
 		return nil, err

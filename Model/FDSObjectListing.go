@@ -3,21 +3,21 @@ package Model
 import "encoding/json"
 
 type FDSObjectListing struct {
-	BucketName string
+	BucketName string `json: "name"`
 	Prefix     string
 	Delimiter  string
 	Marker     string
 	NextMarker string
 	MaxKeys    int
 	Truncated  bool
-	ObjectSummaries []FDSObjectSummary
+	ObjectSummaries []FDSObjectSummary `json: "objects"`
 	CommonPrefixes  []string
 	rawJsonValue    []byte
 }
 
 func NewFDSObjectListing(jsonValue json) (*FDSObjectListing, error) {
 	var fdsObjectListing FDSObjectListing
-	err := json.Unmarshal(jsonValue, fdsObjectListing)
+	err := json.Unmarshal(jsonValue, &fdsObjectListing)
 	if err != nil {
 		return nil, err
 	}
