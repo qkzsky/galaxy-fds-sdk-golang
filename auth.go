@@ -8,15 +8,16 @@ import (
 	"strings"
 	"sort"
 	"bytes"
-	"fmt"
 )
 
 func getDateFromUrl(urlStr string) string {
-	queryParams, err := url.ParseQuery(urlStr)
+	urlParsed, err := url.Parse(urlStr)
 	if err != nil {
 		return ""
 	}
+	queryParams:= urlParsed.Query()
 	d, ok := queryParams["Expires"]
+
 	if !ok || len(d) == 0 {
 		return ""
 	}
@@ -166,10 +167,11 @@ func Signature(app_secret, method, u string, headers map[string][]string) (strin
 		return "", err
 	}
 	string_to_sign.Write(cr)
-	fmt.Printf("%v", string_to_sign.String())
-	fmt.Printf("%v\n", string_to_sign.String())
 	h := hmac.New(sha1.New, []byte(app_secret))
-	h.Write(string_to_sign.Bytes())
+	_, err = h.Write(string_to_sign.Bytes())
+	if err != nil {
+		return "", err
+	}
 	b := base64.StdEncoding.EncodeToString(h.Sum(nil))
 	return b, nil
 }

@@ -318,7 +318,6 @@ func (c *FDSClient) List_Object(bucketname, prefix, delimiter string, maxKeys in
 		return nil, err
 	}
 	body, err := ioutil.ReadAll(res.Body)
-	fmt.Printf("%v", string(body))
 	res.Body.Close()
 	if err != nil {
 		return nil, err
@@ -419,7 +418,7 @@ func (c *FDSClient) Put_Object(bucketname string, objectname string,
 	}
 	md5sum := fmt.Sprintf("%x", md5.Sum(data))
 	auth := FDSAuth{
-		UrlBase:          url,
+		UrlBase:       url,
 		Method:       "PUT",
 		Data:         data,
 		Content_Md5:  md5sum,
@@ -726,15 +725,86 @@ func (c *FDSClient) Get_Object_Meta(bucketname, objectname string) (*Model.FDSMe
 }
 
 func (c *FDSClient) Generate_Presigned_URI(bucketname, objectname, method string,
-expiration int64) (string, error) {
-	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname + DELIMITER +
-	objectname + "?" + GALAXY_ACCESS_KEY_ID + "=" + c.App_key + "&" +
-	EXPIRES + "=" + fmt.Sprintf("%d", expiration) + "&"
-	signature, err := Signature(c.App_key, method, url, map[string][]string{})
+expiration int64, headers map[string][]string) (string, error) {
+	urlStr := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname + DELIMITER +
+	objectname
+
+	urlParsed, err := url.Parse(urlStr)
 	if err != nil {
 		return "", err
 	}
-	return url + SIGNATURE + "=" + signature, nil
+	params := url.Values{}
+	params.Add(GALAXY_ACCESS_KEY_ID, c.App_key)
+	params.Add(EXPIRES, fmt.Sprintf("%d", expiration))
+	urlParsed.RawQuery = params.Encode()
+	signature, err := Signature(c.App_secret, method, urlParsed.String(), headers)
+	if err != nil {
+		return "", err
+	}
+
+	//params.Add(SIGNATURE, signature)
+	//urlParsed.RawQuery = params.Encode()
+	return urlParsed.String() + "&" + SIGNATURE + "=" + signature, nil
+}
+
+func (c *FDSClient) Delete_Objects(bucketname string, prefix []string) error {
+	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname
+	prefixJson, err := json.Marshal(prefix)
+	if err != nil {
+		return err
+	}
+	auth := FDSAuth{
+		UrlBase:      url,
+		Method:       "PUT",
+		Data:         prefixJson,
+		Content_Md5:  "",
+		Headers:      map[string]string{},
+		Params:       map[string]string {
+			"deleteObjects": "",
+		},
+	}
+	res, err := c.Auth(auth)
+	if err != nil {
+		return err
+	}
+	body, err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		return err
+	}
+	if res.StatusCode != 200 {
+		return errors.New(string(body))
+	}
+	return nil
+}
+
+func (c *FDSClient) Delete_Objects_With_Prefix(bucketname, prefix string) error {
+	listObjectResult, err := c.List_Object(bucketname, prefix, "", DEFAULT_LIST_MAX_KEYS)
+	if err != nil {
+		return err
+	}
+
+	for true {
+		prefixArray := []string{}
+		for _, k := range(listObjectResult.ObjectSummaries) {
+			prefixArray = append(prefixArray, k.ObjectName)
+		}
+
+		err = c.Delete_Objects(bucketname, prefixArray)
+		if err != nil {
+			return err
+		}
+
+		if !listObjectResult.Truncated {
+			break
+		}
+		listObjectResult, err = c.List_Next_Batch_Of_Objects(listObjectResult)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // list_object_next
