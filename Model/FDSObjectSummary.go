@@ -6,9 +6,8 @@ import (
 )
 
 type FDSObjectSummary struct {
-	BucketName string `json:"name"`
 	Etag       string
-	ObjectName string
+	ObjectName string `json:"name"`
 	Owner      Owner
 	Size       int64
 	LastModified time.Time

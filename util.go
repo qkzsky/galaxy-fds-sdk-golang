@@ -249,6 +249,8 @@ func (c *FDSClient) Is_Object_Exists(bucketname, objectname string) (bool, error
 	}
 	if res.StatusCode == 200 {
 		return true, nil
+	} else if res.StatusCode == 404 {
+		return false, nil
 	} else {
 		return false, errors.New(string(body))
 	}
@@ -297,10 +299,6 @@ func (c *FDSClient) Get_Object(bucketname, objectname string, position int64, si
 
 // prefix需要改进
 func (c *FDSClient) List_Object(bucketname, prefix, delimiter string, maxKeys int) (*Model.FDSObjectListing, error) {
-	if len(delimiter) == 0 {
-		delimiter = DELIMITER
-	}
-
 	urlStr := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname
 	auth := FDSAuth{
 		UrlBase:          urlStr,
@@ -320,6 +318,7 @@ func (c *FDSClient) List_Object(bucketname, prefix, delimiter string, maxKeys in
 		return nil, err
 	}
 	body, err := ioutil.ReadAll(res.Body)
+	fmt.Printf("%v", string(body))
 	res.Body.Close()
 	if err != nil {
 		return nil, err

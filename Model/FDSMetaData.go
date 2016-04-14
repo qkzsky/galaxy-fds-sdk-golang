@@ -3,6 +3,7 @@ package Model
 import (
 	"errors"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -22,7 +23,10 @@ type FDSMetaData struct {
 
 func NewFDSMetaData(rawValue map[string][]string) (*FDSMetaData){
 	var fdsMetaData FDSMetaData
-	fdsMetaData.m = rawValue
+	fdsMetaData.m = map[string][]string{}
+	for k, v := range(rawValue) {
+		fdsMetaData.m[strings.ToLower(k)] = v
+	}
 	return &fdsMetaData
 }
 
@@ -31,10 +35,10 @@ func (d *FDSMetaData) GetKey(k string) (string, error) {
 	if !ok {
 		return "", errors.New("No such meta: " + k)
 	}
-	if len(r) == 0 {
-		return "", nil
+	if len(r) > 0 {
+		return r[0], nil
 	}
-	return r[0], nil
+	return "", nil
 }
 
 func (d *FDSMetaData) GetContentEncoding() (string, error) {
