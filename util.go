@@ -14,6 +14,9 @@ import (
 	"bytes"
 	"github.com/Shenjiaqi/galaxy-fds-sdk-golang/Model"
 	"time"
+	"crypto/md5"
+	"net/url"
+	"strconv"
 )
 
 const (
@@ -53,12 +56,13 @@ type FDSClient struct {
 }
 
 type FDSAuth struct {
-	Url          string
+	UrlBase      string
 	Method       string
 	Data         []byte
 	Content_Md5  string
 	Content_Type string
 	Headers      map[string]string
+	Params       map[string]string
 }
 
 func NEWFDSClient(App_key, App_secret string) *FDSClient {
@@ -70,18 +74,41 @@ func NEWFDSClient(App_key, App_secret string) *FDSClient {
 
 func (c *FDSClient) Auth(auth FDSAuth) (*http.Response, error) {
 	client := &http.Client{}
-	req, _ := http.NewRequest(auth.Method, auth.Url,
-		bytes.NewReader(auth.Data))
-	signature := Signature(
-		c.App_secret, req.Method, auth.Url,
-		auth.Content_Md5, auth.Content_Type)
+
+	urlParsed, err := url.Parse(auth.UrlBase)
+	if err != nil {
+		return nil, err
+	}
+	params := url.Values{}
+	for k, v := range(urlParsed.Query()) {
+		if len(v) > 0 {
+			params.Add(k, v[0])
+		} else {
+			params.Add(k, "")
+		}
+	}
+	if len(auth.Params) > 0 {
+		for k, v := range (auth.Params) {
+			params.Add(k, v)
+		}
+	}
+	urlParsed.RawQuery = params.Encode()
+	urlStr := urlParsed.String()
+
+	req, _ := http.NewRequest(auth.Method, urlStr, bytes.NewReader(auth.Data))
 	for k, v := range auth.Headers {
 		req.Header.Add(k, v)
 	}
-	req.Header.Add("authorization", fmt.Sprintf("Galaxy-V2 %s:%s", c.App_key, signature))
 	req.Header.Add("date", time.Now().Format(time.RFC1123))
 	req.Header.Add("content-md5", auth.Content_Md5)
 	req.Header.Add("content-type", auth.Content_Type)
+
+	signature, err := Signature(c.App_secret, req.Method, urlStr, req.Header)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("authorization", fmt.Sprintf("Galaxy-V2 %s:%s", c.App_key, signature))
 	res, err := client.Do(req)
 	return res, err
 }
@@ -89,7 +116,7 @@ func (c *FDSClient) Auth(auth FDSAuth) (*http.Response, error) {
 func (c *FDSClient) Is_Bucket_Exists(bucketname string) (bool, error) {
 	url := DEFAULT_FDS_SERVICE_BASE_URI + bucketname
 	auth := FDSAuth{
-		Url:          url,
+		UrlBase:          url,
 		Method:       "HEAD",
 		Data:         nil,
 		Content_Md5:  "",
@@ -116,7 +143,7 @@ func (c *FDSClient) List_Bucket() ([]string, error) {
 	bucketlist := []string{}
 	url := DEFAULT_FDS_SERVICE_BASE_URI
 	auth := FDSAuth{
-		Url:          url,
+		UrlBase:          url,
 		Method:       "GET",
 		Data:         nil,
 		Content_Md5:  "",
@@ -152,7 +179,7 @@ func (c *FDSClient) List_Bucket() ([]string, error) {
 func (c *FDSClient) Create_Bucket(bucketname string) (bool, error) {
 	url := DEFAULT_FDS_SERVICE_BASE_URI + bucketname
 	auth := FDSAuth{
-		Url:          url,
+		UrlBase:          url,
 		Method:       "PUT",
 		Data:         nil,
 		Content_Md5:  "",
@@ -178,7 +205,7 @@ func (c *FDSClient) Create_Bucket(bucketname string) (bool, error) {
 func (c *FDSClient) Delete_Bucket(bucketname string) (bool, error) {
 	url := DEFAULT_FDS_SERVICE_BASE_URI + bucketname
 	auth := FDSAuth{
-		Url:          url,
+		UrlBase:          url,
 		Method:       "DELETE",
 		Data:         nil,
 		Content_Md5:  "",
@@ -204,7 +231,7 @@ func (c *FDSClient) Delete_Bucket(bucketname string) (bool, error) {
 func (c *FDSClient) Is_Object_Exists(bucketname, objectname string) (bool, error) {
 	url := DEFAULT_FDS_SERVICE_BASE_URI + bucketname + DELIMITER + objectname
 	auth := FDSAuth{
-		Url:          url,
+		UrlBase:          url,
 		Method:       "HEAD",
 		Data:         nil,
 		Content_Md5:  "",
@@ -240,7 +267,7 @@ func (c *FDSClient) Get_Object(bucketname, objectname string, position int64, si
 		headers["range"] = fmt.Sprintf("bytes=%d-%d", position, position + size - 1)
 	}
 	auth := FDSAuth{
-		Url:          url,
+		UrlBase:          url,
 		Method:       "GET",
 		Data:         nil,
 		Content_Md5:  "",
@@ -274,15 +301,19 @@ func (c *FDSClient) List_Object(bucketname, prefix, delimiter string, maxKeys in
 		delimiter = DELIMITER
 	}
 
-	url := DEFAULT_FDS_SERVICE_BASE_URI + bucketname + "?prefix=" + prefix +
-	"&delimiter=" + delimiter + "&maxKeys=" + fmt.Sprintf("%d", maxKeys)
+	urlStr := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname
 	auth := FDSAuth{
-		Url:          url,
+		UrlBase:          urlStr,
 		Method:       "GET",
 		Data:         nil,
 		Content_Md5:  "",
 		Content_Type: "",
 		Headers:      map[string]string{},
+		Params:       map[string]string{
+			"prefix": prefix,
+			"delimiter": delimiter,
+			"maxKeys": strconv.Itoa(maxKeys),
+		},
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
@@ -307,19 +338,23 @@ func (c *FDSClient) List_Next_Batch_Of_Objects(previous *Model.FDSObjectListing)
 	bucketName := previous.BucketName
 	prefix := previous.Prefix
 	delimiter := previous.Delimiter
-	marker := previous.Marker
+	marker := previous.NextMarker
 	maxKeys := previous.MaxKeys
-	url := DEFAULT_FDS_SERVICE_BASE_URI + bucketName + "?prefix=" + prefix +
-	"&delimiter=" + delimiter + "&maxKeys=" + fmt.Sprintf("%d", maxKeys) +
-	"&marker=" + marker
+	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketName
 
 	auth := FDSAuth{
-		Url:          url,
+		UrlBase:      url,
 		Method:       "GET",
 		Data:         nil,
 		Content_Md5:  "",
 		Content_Type: "",
 		Headers:      map[string]string{},
+		Params:       map[string]string {
+			"prefix": prefix,
+			"delimiter": delimiter,
+			"maxKeys": strconv.Itoa(maxKeys),
+			"marker": marker,
+		},
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
@@ -348,7 +383,7 @@ func (c *FDSClient) Post_Object(bucketname string, data []byte, filetype string)
 		content_type = "application/octet-stream"
 	}
 	auth := FDSAuth{
-		Url:          url,
+		UrlBase:          url,
 		Method:       "POST",
 		Data:         data,
 		Content_Md5:  "",
@@ -378,21 +413,18 @@ func (c *FDSClient) Post_Object(bucketname string, data []byte, filetype string)
 
 // v2类型  自定义文件名 如果object已存在，将会覆盖
 func (c *FDSClient) Put_Object(bucketname string, objectname string,
-                               data []byte, filetype string) (*Model.PutObjectResult, error) {
+                               data []byte, contentType string) (*Model.PutObjectResult, error) {
 	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname + DELIMITER + objectname
-	if !strings.HasPrefix(filetype, ".") {
-		filetype = "." + filetype
+	if contentType == "" {
+		contentType = "application/octet-stream"
 	}
-	content_type := mime.TypeByExtension(filetype)
-	if content_type == "" {
-		content_type = "application/octet-stream"
-	}
+	md5sum := fmt.Sprintf("%x", md5.Sum(data))
 	auth := FDSAuth{
-		Url:          url,
+		UrlBase:          url,
 		Method:       "PUT",
 		Data:         data,
-		Content_Md5:  "",
-		Content_Type: content_type,
+		Content_Md5:  md5sum,
+		Content_Type: contentType,
 		Headers:      map[string]string{},
 	}
 	res, err := c.Auth(auth)
@@ -414,7 +446,7 @@ func (c *FDSClient) Put_Object(bucketname string, objectname string,
 func (c *FDSClient) Delete_Object(bucketname, objectname string) (bool, error) {
 	url := DEFAULT_FDS_SERVICE_BASE_URI + bucketname + DELIMITER + objectname
 	auth := FDSAuth{
-		Url:          url,
+		UrlBase:          url,
 		Method:       "DELETE",
 		Data:         nil,
 		Content_Md5:  "",
@@ -441,7 +473,7 @@ func (c *FDSClient) Rename_Object(bucketname, src_objectname, dst_objectname str
 	url := DEFAULT_FDS_SERVICE_BASE_URI + bucketname + DELIMITER + src_objectname +
 		"?renameTo=" + dst_objectname
 	auth := FDSAuth{
-		Url:          url,
+		UrlBase:          url,
 		Method:       "PUT",
 		Data:         nil,
 		Content_Md5:  "",
@@ -467,7 +499,7 @@ func (c *FDSClient) Rename_Object(bucketname, src_objectname, dst_objectname str
 func (c *FDSClient) Prefetch_Object(bucketname, objectname string) (bool, error) {
 	url := DEFAULT_FDS_SERVICE_BASE_URI + bucketname + DELIMITER + objectname + "?prefetch"
 	auth := FDSAuth{
-		Url:          url,
+		UrlBase:          url,
 		Method:       "PUT",
 		Data:         nil,
 		Content_Md5:  "",
@@ -493,7 +525,7 @@ func (c *FDSClient) Prefetch_Object(bucketname, objectname string) (bool, error)
 func (c *FDSClient) Refresh_Object(bucketname, objectname string) (bool, error) {
 	url := DEFAULT_FDS_SERVICE_BASE_URI + bucketname + DELIMITER + objectname + "?refresh"
 	auth := FDSAuth{
-		Url:          url,
+		UrlBase:          url,
 		Method:       "PUT",
 		Data:         nil,
 		Content_Md5:  "",
@@ -523,7 +555,7 @@ func (c *FDSClient) Set_Object_Acl(bucketname, objectname string, acl map[string
 	jsonString, _ := json.Marshal(acp)
 	url := DEFAULT_FDS_SERVICE_BASE_URI + bucketname + DELIMITER + objectname + "?acl"
 	auth := FDSAuth{
-		Url:          url,
+		UrlBase:          url,
 		Method:       "PUT",
 		Data:         jsonString,
 		Content_Md5:  "",
@@ -569,22 +601,22 @@ func (c *FDSClient) Set_Public(bucketname, objectname string, disable_prefetch b
 	return true, nil
 }
 
-func (c *FDSClient) Init_MultiPart_Upload(bucketname, objectname string, filetype string) (*Model.UploadPartResult, error) {
-	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname + DELIMITER + objectname + "?uploads"
-	if !strings.HasPrefix(filetype, ".") {
-		filetype = "." + filetype
+func (c *FDSClient) Init_MultiPart_Upload(bucketname, objectname string, contentType string) (*Model.InitMultipartUploadResult, error) {
+	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname + DELIMITER + objectname
+	if contentType == "" {
+		contentType = "application/octet-stream"
 	}
-	content_type := mime.TypeByExtension(filetype)
-	if content_type == "" {
-		content_type = "application/octet-stream"
-	}
+	md5sum := fmt.Sprintf("%x", md5.Sum([]byte("")))
 	auth := FDSAuth{
-		Url:          url,
+		UrlBase:      url,
 		Method:       "PUT",
-		Data:         nil,
-		Content_Md5:  "",
-		Content_Type: content_type,
-		Headers:      map[string]string{},
+		Data:         []byte(""),
+		Content_Md5:  md5sum,
+		Content_Type: contentType,
+		Headers:      map[string]string{"x-xiaomi-estimated-object-size": "1000000000"},
+		Params:       map[string]string {
+			"uploads": "",
+		},
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
@@ -598,19 +630,25 @@ func (c *FDSClient) Init_MultiPart_Upload(bucketname, objectname string, filetyp
 	if res.StatusCode != 200 {
 		return nil, errors.New(string(body))
 	}
-	return Model.NewUploadPartResult(body)
+
+	return Model.NewInitMultipartUploadResult(body)
 }
 
-func (c *FDSClient) Upload_Part(bucketname, objectname, uploadId string, partnumber int, data []byte) (*Model.UploadPartResult, error) {
-	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname + DELIMITER +
-	objectname + "?uploadId=" + uploadId + "&partNumber=" +
-	fmt.Sprintf("%d", partnumber)
+func (c *FDSClient) Upload_Part(initUploadPartResult *Model.InitMultipartUploadResult, partnumber int, data []byte) (*Model.UploadPartResult, error) {
+	bucketname := initUploadPartResult.BucketName
+	objectname := initUploadPartResult.ObjectName
+	uploadId   := initUploadPartResult.UploadId
+	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname + DELIMITER + objectname
 	auth := FDSAuth{
-		Url:          url,
+		UrlBase:      url,
 		Method:       "PUT",
 		Data:         data,
 		Content_Md5:  "",
 		Headers:      map[string]string{},
+		Params:       map[string]string {
+			"uploadId": uploadId,
+			"partNumber": strconv.Itoa(partnumber),
+		},
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
@@ -618,6 +656,7 @@ func (c *FDSClient) Upload_Part(bucketname, objectname, uploadId string, partnum
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
+
 	if err != nil {
 		return nil, err
 	}
@@ -631,17 +670,20 @@ func (c *FDSClient) Complete_Multipart_Upload(initPartuploadResult *Model.InitMu
 	bucketName := initPartuploadResult.BucketName
 	objectName := initPartuploadResult.ObjectName
 	uploadId := initPartuploadResult.UploadId
-	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketName + DELIMITER + objectName + "?uploadId=" + uploadId
+	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketName + DELIMITER + objectName
 	uploadPartResultListByteArray, err := json.Marshal(uploadPartResultList)
 	if err != nil {
 		return nil, err
 	}
 	auth := FDSAuth{
-		Url:          url,
+		UrlBase:          url,
 		Method:       "PUT",
 		Data:         uploadPartResultListByteArray,
 		Content_Md5:  "",
 		Headers:      map[string]string{},
+		Params:       map[string]string {
+			"uploadId": uploadId,
+		},
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
@@ -663,7 +705,7 @@ func (c *FDSClient) Get_Object_Meta(bucketname, objectname string) (*Model.FDSMe
 	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname +
 	DELIMITER + objectname + "?metadata"
 	auth := FDSAuth{
-		Url:          url,
+		UrlBase:          url,
 		Method:       "GET",
 		Data:         nil,
 		Content_Md5:  "",
@@ -686,11 +728,13 @@ func (c *FDSClient) Get_Object_Meta(bucketname, objectname string) (*Model.FDSMe
 
 func (c *FDSClient) Generate_Presigned_URI(bucketname, objectname, method string,
 expiration int64) (string, error) {
-	expirationStr := fmt.Sprintf("%d", expiration)
 	url := DEFAULT_FDS_SERVICE_BASE_URI_HTTPS + bucketname + DELIMITER +
 	objectname + "?" + GALAXY_ACCESS_KEY_ID + "=" + c.App_key + "&" +
-	EXPIRES + "=" + expirationStr + "&"
-	signature := Signature(c.App_key, method, url, "", "")
+	EXPIRES + "=" + fmt.Sprintf("%d", expiration) + "&"
+	signature, err := Signature(c.App_key, method, url, map[string][]string{})
+	if err != nil {
+		return "", err
+	}
 	return url + SIGNATURE + "=" + signature, nil
 }
 

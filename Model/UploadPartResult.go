@@ -12,7 +12,7 @@ type InitMultipartUploadResult struct {
 func NewInitMultipartUploadResult (jsonValue []byte) (*InitMultipartUploadResult, error){
 
 	var initMultipartUploadResult InitMultipartUploadResult
-	err := json.Unmarshal(jsonValue, initMultipartUploadResult)
+	err := json.Unmarshal(jsonValue, &initMultipartUploadResult)
 	if err != nil {
 		return nil, err
 	}
@@ -21,11 +21,11 @@ func NewInitMultipartUploadResult (jsonValue []byte) (*InitMultipartUploadResult
 }
 
 type UploadPartList struct {
-	uploadPartResultList []UploadPartResult
+	UploadPartResultList []UploadPartResult
 }
 
 func (u *UploadPartList) AddUploadPartResult(i *UploadPartResult) {
-	u.uploadPartResultList = append(u.uploadPartResultList, *i)
+	u.UploadPartResultList = append(u.UploadPartResultList, *i)
 }
 
 type UploadPartResult struct {

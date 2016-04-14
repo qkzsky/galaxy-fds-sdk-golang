@@ -1,16 +1,18 @@
 package Model
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 type FDSObjectListing struct {
-	BucketName string `json: "name"`
+	BucketName string `json:"name"`
 	Prefix     string
 	Delimiter  string
 	Marker     string
 	NextMarker string
 	MaxKeys    int
 	Truncated  bool
-	ObjectSummaries []FDSObjectSummary `json: "objects"`
+	ObjectSummaries []FDSObjectSummary `json:"objects"`
 	CommonPrefixes  []string
 	rawJsonValue    []byte
 }

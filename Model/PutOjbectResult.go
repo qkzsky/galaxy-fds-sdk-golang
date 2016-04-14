@@ -13,7 +13,7 @@ type PutObjectResult struct {
 
 func NewPutObjectResult (jsonValue []byte) (*PutObjectResult, error){
 	var putObjectResult PutObjectResult
-	err := json.Unmarshal(jsonValue, putObjectResult)
+	err := json.Unmarshal(jsonValue, &putObjectResult)
 	if err != nil {
 		return nil, err
 	}
