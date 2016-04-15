@@ -73,12 +73,8 @@ func (d *FDSMetaData) GetLastChecked() (int64, error) {
 	return strconv.ParseInt(s, 10, 64)
 }
 
-func (d *FDSMetaData) GetLastModified() (int64, error) {
-	s, err := d.GetKey(LastModified)
-	if err != nil {
-		return 0, err
-	}
-	return strconv.ParseInt(s, 10, 64)
+func (d *FDSMetaData) GetLastModified() (string, error) {
+	return d.GetKey(LastModified)
 }
 
 func (d *FDSMetaData) GetRawMetadata() (map[string][]string) {

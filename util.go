@@ -17,7 +17,6 @@ import (
 	"crypto/md5"
 	"net/url"
 	"strconv"
-	"net"
 )
 
 const (
@@ -126,19 +125,6 @@ func (c *FDSClient) GetBaseUri() string {
 
 func (c *FDSClient) Auth(auth FDSAuth) (*http.Response, error) {
 	client := &http.Client{
-		Transport: &http.Transport{
-			Dial: func(netw, addr string) (net.Conn, error) {
-				c, err := net.DialTimeout(netw, addr, time.Second*3)
-				if err != nil {
-					fmt.Println("dail timeout", err)
-					return nil, err
-				}
-				return c, nil
-
-			},
-			MaxIdleConnsPerHost:   60,
-			ResponseHeaderTimeout: time.Second * 2,
-		},
 	}
 
 	urlParsed, err := url.Parse(auth.UrlBase)
@@ -510,10 +496,17 @@ headers *map[string]string) (*Model.PutObjectResult, error) {
 	}
 }
 
+func checkNotEmpty(s string) bool {
+	return len(s) > 0
+}
+
 func (c *FDSClient) Delete_Object(bucketname, objectname string) (bool, error) {
+	if !checkNotEmpty(bucketname) || !checkNotEmpty(objectname) {
+		return false, errors.New("empty argument")
+	}
 	url := c.GetBaseUri() + bucketname + DELIMITER + objectname
 	auth := FDSAuth{
-		UrlBase:          url,
+		UrlBase:      url,
 		Method:       "DELETE",
 		Data:         nil,
 		Content_Md5:  "",
@@ -733,12 +726,13 @@ func (c *FDSClient) Upload_Part(initUploadPartResult *Model.InitMultipartUploadR
 	return Model.NewUploadPartResult(body)
 }
 
-func (c *FDSClient) Complete_Multipart_Upload(initPartuploadResult *Model.InitMultipartUploadResult, uploadPartResultList Model.UploadPartList) (*Model.PutObjectResult, error) {
+func (c *FDSClient) Complete_Multipart_Upload(initPartuploadResult *Model.InitMultipartUploadResult,
+uploadPartResultList *Model.UploadPartList) (*Model.PutObjectResult, error) {
 	bucketName := initPartuploadResult.BucketName
 	objectName := initPartuploadResult.ObjectName
 	uploadId := initPartuploadResult.UploadId
 	url := c.GetBaseUri() + bucketName + DELIMITER + objectName
-	uploadPartResultListByteArray, err := json.Marshal(uploadPartResultList)
+	uploadPartResultListByteArray, err := json.Marshal(*uploadPartResultList)
 	if err != nil {
 		return nil, err
 	}
