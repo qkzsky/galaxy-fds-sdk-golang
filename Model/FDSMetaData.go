@@ -81,8 +81,8 @@ func (d *FDSMetaData) GetLastModified() (int64, error) {
 	return strconv.ParseInt(s, 10, 64)
 }
 
-func (d *FDSMetaData) GetRawMetadata() (map[string][]string, error) {
-	return d.m, nil
+func (d *FDSMetaData) GetRawMetadata() (map[string][]string) {
+	return d.m
 }
 
 func (d *FDSMetaData) GetUploadTime() (int64, error) {

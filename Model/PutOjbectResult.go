@@ -1,6 +1,8 @@
 package Model
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 type PutObjectResult struct {
 	BucketName string
