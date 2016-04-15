@@ -17,6 +17,7 @@ import (
 	"crypto/md5"
 	"net/url"
 	"strconv"
+	"net"
 )
 
 const (
@@ -124,7 +125,21 @@ func (c *FDSClient) GetBaseUri() string {
 }
 
 func (c *FDSClient) Auth(auth FDSAuth) (*http.Response, error) {
-	client := &http.Client{}
+	client := &http.Client{
+		Transport: &http.Transport{
+			Dial: func(netw, addr string) (net.Conn, error) {
+				c, err := net.DialTimeout(netw, addr, time.Second*3)
+				if err != nil {
+					fmt.Println("dail timeout", err)
+					return nil, err
+				}
+				return c, nil
+
+			},
+			MaxIdleConnsPerHost:   60,
+			ResponseHeaderTimeout: time.Second * 2,
+		},
+	}
 
 	urlParsed, err := url.Parse(auth.UrlBase)
 	if err != nil {

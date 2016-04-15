@@ -25,14 +25,14 @@ func getObjectName4test() string {
 	return "golang-test-" + runtime.FuncForPC(pc).Name() + "-" + time.Now().Format(time.RFC3339)
 }
 
+var client *galaxy_fds_sdk_golang.FDSClient
 
 func Test_Put_Get_Object(t *testing.T) {
 	//t.Skip()
-	client := galaxy_fds_sdk_golang.NEWFDSClient(APP_KEY, SECRET_KEY)
 	objectName := getObjectName4test()
 
 	content := []byte("blah" + time.Now().Format(time.ANSIC))
-	_, err := client.Put_Object(BUCKET_NAME, objectName, content, "")
+	_, err := client.Put_Object(BUCKET_NAME, objectName, content, "", nil)
 	if err != nil {
 		t.Error("Fail to put object: "  + objectName, err)
 	}
@@ -49,7 +49,6 @@ func Test_Put_Get_Object(t *testing.T) {
 
 func Test_MultiPartUpload(t *testing.T) {
 	//t.Skip()
-	client := galaxy_fds_sdk_golang.NEWFDSClient(APP_KEY, SECRET_KEY)
 	objectName := getObjectName4test()
 
 	initMultiPartResult, err := client.Init_MultiPart_Upload(BUCKET_NAME, objectName, "")
@@ -58,8 +57,8 @@ func Test_MultiPartUpload(t *testing.T) {
 	}
 
 	var content [3][]byte
-	content[0] = make([]byte, 777)
-	content[1] = make([]byte, 7777)
+	content[0] = make([]byte, 77777)
+	content[1] = make([]byte, 77777)
 	content[2] = make([]byte, 77777)
 
 	var uploadPartList Model.UploadPartList
@@ -80,7 +79,7 @@ func Test_MultiPartUpload(t *testing.T) {
 
 	_, err = client.Complete_Multipart_Upload(initMultiPartResult, uploadPartList)
 	if err != nil {
-		t.Error("Fail to complete multipart upload")
+		t.Error("Fail to complete multipart upload", err)
 	}
 
 	fdsobject, err := client.Get_Object(BUCKET_NAME, objectName, 0, -1)
@@ -97,7 +96,6 @@ func Test_MultiPartUpload(t *testing.T) {
 
 func Test_ListObjects(t *testing.T) {
 	//t.Skip()
-	client := galaxy_fds_sdk_golang.NEWFDSClient(APP_KEY, SECRET_KEY)
 	objectName := []string{
 	"aaa/bbb/ccc/file1",
 	"aaa/bbb/ccc/file2",
@@ -107,7 +105,7 @@ func Test_ListObjects(t *testing.T) {
 	objectContent := []byte("blah")
 
 	for _, name := range(objectName) {
-		client.Put_Object(BUCKET_NAME, name, objectContent, "")
+		client.Put_Object(BUCKET_NAME, name, objectContent, "", nil)
 	}
 
 	listObjectResult, err := client.List_Object(BUCKET_NAME, "aab/", "/", 2)
@@ -158,11 +156,10 @@ func Test_ListObjects(t *testing.T) {
 
 func Test_DeleteObject (t *testing.T) {
 	//t.Skip()
-	client := galaxy_fds_sdk_golang.NEWFDSClient(APP_KEY, SECRET_KEY)
 	objectName := getObjectName4test()
 	objectContent := "blah"
 
-	_, err := client.Put_Object(BUCKET_NAME, objectName, []byte(objectContent), "")
+	_, err := client.Put_Object(BUCKET_NAME, objectName, []byte(objectContent), "", nil)
 	if err != nil {
 		t.Error("Fail to put object: " + objectName)
 	}
@@ -192,12 +189,19 @@ func Test_DeleteObject (t *testing.T) {
 
 func Test_Metadata (t *testing.T) {
 	//t.Skip()
-	client := galaxy_fds_sdk_golang.NEWFDSClient(APP_KEY, SECRET_KEY)
 	objectName := getObjectName4test()
 	objectContent := "blah"
 	contentType := "xxx/yyy"
+	xiaomiMetaData := "x-xiaomi-meta-kakaka"
 
-	_, err := client.Put_Object(BUCKET_NAME, objectName, []byte(objectContent), contentType)
+	headers := map[string]string {
+		xiaomiMetaData: "I used to roll the dice",
+		"wawawa": "see the fear in my enemies' eyes",
+	}
+
+	_, err := client.Put_Object(BUCKET_NAME, objectName, []byte(objectContent),
+		contentType,
+		&headers)
 	if err != nil {
 		fmt.Printf("Fail to put object: " + objectName)
 	}
@@ -215,13 +219,27 @@ func Test_Metadata (t *testing.T) {
 	if strings.Compare(contentTypeGot, contentType) != 0 {
 		t.Error("wrong content type, expect: " + contentType + " got: " + contentTypeGot, err)
 	}
+
+	h, err := metadataGot.GetKey(xiaomiMetaData)
+	if err != nil {
+		t.Error(xiaomiMetaData + " no exists", err)
+	}
+
+	if strings.Compare(h, headers[xiaomiMetaData]) != 0 {
+		t.Error(xiaomiMetaData + " content changed, expect: " + headers[xiaomiMetaData] + " got: " + h)
+	}
+
+	_, err = metadataGot.GetKey("wawawa")
+	if err == nil {
+		t.Error("header wawawa not expected to exist")
+	}
 }
 
 func Test_Presigned_Url(t *testing.T) {
+	//t.Skip()
 	objectName := getObjectName4test()
 	objectContent := "blah"
 	contentType := "text/plain"
-	client := galaxy_fds_sdk_golang.NEWFDSClient(APP_KEY, SECRET_KEY)
 	url, err := client.Generate_Presigned_URI(BUCKET_NAME,
 		objectName,
 		"PUT",
@@ -282,25 +300,28 @@ func Test_Presigned_Url(t *testing.T) {
 
 func deleteOneBucket(client *galaxy_fds_sdk_golang.FDSClient) {
 	client.Delete_Objects_With_Prefix(BUCKET_NAME, "")
+	client.Delete_Bucket(BUCKET_NAME)
 }
 
 func setUpTest () {
-	client := galaxy_fds_sdk_golang.NEWFDSClient(APP_KEY, SECRET_KEY)
 	exists, err := client.Is_Bucket_Exists(BUCKET_NAME)
 	if err != nil {
 		if exists {
 			deleteOneBucket(client)
 		}
 	}
+	client.Create_Bucket(BUCKET_NAME)
 }
 
 func tearDown() {
-	client := galaxy_fds_sdk_golang.NEWFDSClient(APP_KEY, SECRET_KEY)
 	deleteOneBucket(client)
 }
 
 
 func TestMain(m *testing.M) {
+	client = galaxy_fds_sdk_golang.NEWFDSClient(APP_KEY, SECRET_KEY,
+		galaxy_fds_sdk_golang.REGION_CNBJ0,
+		true, true)
 	setUpTest()
 	r := m.Run()
 	tearDown()
