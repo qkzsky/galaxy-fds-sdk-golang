@@ -17,6 +17,7 @@ import (
 	"crypto/md5"
 	"net/url"
 	"strconv"
+	"io"
 )
 
 const (
@@ -103,6 +104,20 @@ func (c *FDSClient) getBaseUriPrefix() string {
 	return c.RegionName + "-" + URI_FILES;
 }
 
+func (c *FDSClient) getUploadUriPrefix() string {
+	if len(c.RegionName) == 0 {
+		return URI_FILES
+	}
+	if c.EnableCDN {
+		return c.RegionName + "-" + URI_CDN;
+	}
+	return c.RegionName + "-" + URI_FILES;
+}
+
+func (c *FDSClient) getUploadUriSuffix () string {
+	return URI_FDS_SUFFIX
+}
+
 func (c *FDSClient) getBaseUriSuffix () string {
 	if c.EnableCDN && c.EnableHttps {
 		return URI_FDS_SSL_SUFFIX
@@ -123,13 +138,27 @@ func (c *FDSClient) GetBaseUri() string {
 	return u.String()
 }
 
+func (c *FDSClient) GetUploadURL() string {
+	u := bytes.Buffer{}
+	if c.EnableHttps {
+		u.WriteString(URI_HTTPS_PREFIX)
+	} else {
+		u.WriteString(URI_HTTP_PREFIX)
+	}
+
+	u.WriteString(c.getUploadUriPrefix())
+	u.WriteString(c.getUploadUriSuffix())
+	return u.String()
+}
+
+
 func (c *FDSClient) Auth(auth FDSAuth) (*http.Response, error) {
 	client := &http.Client{
 	}
 
 	urlParsed, err := url.Parse(auth.UrlBase)
 	if err != nil {
-		return nil, err
+		return nil, Model.NewFDSError(err.Error(), -1)
 	}
 	params := url.Values{}
 	for k, v := range(urlParsed.Query()) {
@@ -147,7 +176,7 @@ func (c *FDSClient) Auth(auth FDSAuth) (*http.Response, error) {
 	urlParsed.RawQuery = params.Encode()
 	urlStr := urlParsed.String()
 
-	req, _ := http.NewRequest(auth.Method, urlStr, bytes.NewReader(auth.Data))
+	req, _ := http.NewRequest(auth.Method, urlStr, ioutil.NopCloser(bytes.NewReader(auth.Data)))
 	if auth.Headers != nil {
 		for k, v := range *auth.Headers {
 			req.Header.Add(k, v)
@@ -159,12 +188,15 @@ func (c *FDSClient) Auth(auth FDSAuth) (*http.Response, error) {
 
 	signature, err := Signature(c.AppSecret, req.Method, urlStr, req.Header)
 	if err != nil {
-		return nil, err
+		return nil, Model.NewFDSError(err.Error(), -1)
 	}
 
 	req.Header.Add("authorization", fmt.Sprintf("Galaxy-V2 %s:%s", c.AppKey, signature))
 	res, err := client.Do(req)
-	return res, err
+	if err != nil {
+		return nil, Model.NewFDSError(err.Error(), -1)
+	}
+	return res, nil
 }
 
 func (c *FDSClient) Is_Bucket_Exists(bucketname string) (bool, error) {
@@ -179,17 +211,17 @@ func (c *FDSClient) Is_Bucket_Exists(bucketname string) (bool, error) {
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
-		return false, err
+		return false, Model.NewFDSError(err.Error(), -1)
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
-		return false, err
+		return false, Model.NewFDSError(err.Error(), -1)
 	}
 	if res.StatusCode == 200 {
 		return true, nil
 	} else {
-		return false, errors.New(string(body))
+		return false, Model.NewFDSError(string(body), res.StatusCode)
 	}
 }
 
@@ -206,17 +238,17 @@ func (c *FDSClient) List_Bucket() ([]string, error) {
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
-		return bucketlist, err
+		return bucketlist, Model.NewFDSError(err.Error(), -1)
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
-		return bucketlist, err
+		return bucketlist, Model.NewFDSError(err.Error(), -1)
 	}
 	if res.StatusCode == 200 {
 		sj, err := sJson.NewJson(body)
 		if err != nil {
-			return bucketlist, err
+			return bucketlist, Model.NewFDSError(err.Error(), -1)
 		}
 		buckets, _ := sj.Get("buckets").Array()
 		for _, bucket := range buckets {
@@ -226,12 +258,12 @@ func (c *FDSClient) List_Bucket() ([]string, error) {
 		}
 		return bucketlist, nil
 	} else {
-		return bucketlist, errors.New(string(body))
+		return bucketlist, Model.NewFDSError(string(body), res.StatusCode)
 	}
 }
 
 func (c *FDSClient) Create_Bucket(bucketname string) (bool, error) {
-	url := c.GetBaseUri() + bucketname
+	url := c.GetUploadURL() + bucketname
 	auth := FDSAuth{
 		UrlBase:          url,
 		Method:       "PUT",
@@ -242,17 +274,17 @@ func (c *FDSClient) Create_Bucket(bucketname string) (bool, error) {
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
-		return false, err
+		return false, Model.NewFDSError(err.Error(), -1)
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
-		return false, err
+		return false, Model.NewFDSError(err.Error(), -1)
 	}
 	if res.StatusCode == 200 {
 		return true, nil
 	} else {
-		return false, errors.New(string(body))
+		return false, Model.NewFDSError(string(body), res.StatusCode)
 	}
 }
 
@@ -268,17 +300,17 @@ func (c *FDSClient) Delete_Bucket(bucketname string) (bool, error) {
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
-		return false, err
+		return false, Model.NewFDSError(err.Error(), -1)
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
-		return false, err
+		return false, Model.NewFDSError(err.Error(), -1)
 	}
 	if res.StatusCode == 200 {
 		return true, nil
 	} else {
-		return false, errors.New(string(body))
+		return false, Model.NewFDSError(string(body), res.StatusCode)
 	}
 }
 
@@ -294,36 +326,35 @@ func (c *FDSClient) Is_Object_Exists(bucketname, objectname string) (bool, error
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
-		return false, err
+		return false, Model.NewFDSError(err.Error(), -1)
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
-		return false, err
+		return false, Model.NewFDSError(err.Error(), -1)
 	}
 	if res.StatusCode == 200 {
 		return true, nil
 	} else if res.StatusCode == 404 {
 		return false, nil
 	} else {
-		return false, errors.New(string(body))
+		return false, Model.NewFDSError(string(body), res.StatusCode)
 	}
 }
 
 func (c *FDSClient) Get_Object(bucketname, objectname string, position int64, size int64) (*Model.FDSObject, error) {
 	if position < 0 {
-		err := errors.New("Seek position should be no less than 0")
-		return nil, err
+		return nil, Model.NewFDSError("Seek position should be no less than 0", -1)
 	}
 	url := c.GetBaseUri() + bucketname + DELIMITER + objectname
 	headers := map[string]string{}
-	if position > 0 && size < 0 {
+	if position >= 0 && size < 0 {
 		headers["range"] = fmt.Sprintf("bytes=%d-", position)
 	} else if position > 0 && size > 0 {
 		headers["range"] = fmt.Sprintf("bytes=%d-%d", position, position + size - 1)
 	}
 	auth := FDSAuth{
-		UrlBase:          url,
+		UrlBase:      url,
 		Method:       "GET",
 		Data:         nil,
 		Content_Md5:  "",
@@ -332,12 +363,12 @@ func (c *FDSClient) Get_Object(bucketname, objectname string, position int64, si
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
-		return nil, err
+		return nil, Model.NewFDSError(err.Error(), -1)
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
-		return nil, err
+		return nil, Model.NewFDSError(err.Error(), -1)
 	}
 	if res.StatusCode == http.StatusOK || res.StatusCode == http.StatusPartialContent {
 		return &Model.FDSObject{
@@ -347,10 +378,44 @@ func (c *FDSClient) Get_Object(bucketname, objectname string, position int64, si
 			ObjectContent: body,
 		}, nil
 	} else {
-		return nil, errors.New(string(body))
+		return nil, Model.NewFDSError(string(body), res.StatusCode)
 	}
 }
 
+func (c *FDSClient) Get_Object_Reader(bucketname, objectname string, position int64, size int64) (*io.ReadCloser, error) {
+	if position < 0 {
+		return nil, Model.NewFDSError("Seek position should be no less than 0", -1)
+	}
+	url := c.GetBaseUri() + bucketname + DELIMITER + objectname
+	headers := map[string]string{}
+	if position > 0 && size < 0 {
+		headers["range"] = fmt.Sprintf("bytes=%d-", position)
+	} else if position > 0 && size > 0 {
+		headers["range"] = fmt.Sprintf("bytes=%d-%d", position, position + size - 1)
+	}
+	auth := FDSAuth{
+		UrlBase:      url,
+		Method:       "GET",
+		Data:         nil,
+		Content_Md5:  "",
+		Content_Type: "",
+		Headers:      &headers,
+	}
+	res, err := c.Auth(auth)
+	if err != nil {
+		return nil, Model.NewFDSError(err.Error(), -1)
+	}
+	if res.StatusCode == http.StatusOK || res.StatusCode == http.StatusPartialContent {
+		return &res.Body, nil
+	} else {
+		body, err := ioutil.ReadAll(res.Body)
+		res.Body.Close()
+		if err != nil {
+			return nil, Model.NewFDSError(err.Error(), res.StatusCode)
+		}
+		return nil, Model.NewFDSError(string(body), res.StatusCode)
+	}
+}
 // prefix需要改进
 func (c *FDSClient) List_Object(bucketname, prefix, delimiter string, maxKeys int) (*Model.FDSObjectListing, error) {
 	urlStr := c.GetBaseUri() + bucketname
@@ -369,17 +434,17 @@ func (c *FDSClient) List_Object(bucketname, prefix, delimiter string, maxKeys in
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
-		return nil, err
+		return nil, Model.NewFDSError(err.Error(), -1)
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
-		return nil, err
+		return nil, Model.NewFDSError(err.Error(), -1)
 	}
 	if res.StatusCode == 200 {
 		return Model.NewFDSObjectListing(body)
 	} else {
-		return nil, errors.New(string(body))
+		return nil, Model.NewFDSError(string(body), res.StatusCode)
 	}
 }
 
@@ -410,17 +475,17 @@ func (c *FDSClient) List_Next_Batch_Of_Objects(previous *Model.FDSObjectListing)
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
-		return nil, err
+		return nil, Model.NewFDSError(err.Error(), -1)
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
-		return nil, err
+		return nil, Model.NewFDSError(err.Error(), -1)
 	}
 	if res.StatusCode == 200 {
 		return Model.NewFDSObjectListing(body)
 	} else {
-		return nil, errors.New(string(body))
+		return nil, Model.NewFDSError(string(body), res.StatusCode)
 	}
 }
 
@@ -444,22 +509,22 @@ func (c *FDSClient) Post_Object(bucketname string, data []byte, filetype string)
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
-		return "", err
+		return "", Model.NewFDSError(err.Error(), -1)
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
-		return "", err
+		return "", Model.NewFDSError(err.Error(), -1)
 	}
 	if res.StatusCode == 200 {
 		sj, err := sJson.NewJson(body)
 		if err != nil {
-			return "", err
+			return "", Model.NewFDSError(err.Error(), -1)
 		}
 		objectname, _ := sj.Get("objectName").String()
 		return objectname, nil
 	} else {
-		return "", errors.New(string(body))
+		return "", Model.NewFDSError(string(body), res.StatusCode)
 	}
 }
 
@@ -467,7 +532,7 @@ func (c *FDSClient) Post_Object(bucketname string, data []byte, filetype string)
 func (c *FDSClient) Put_Object(bucketname string, objectname string,
                                data []byte, contentType string,
 headers *map[string]string) (*Model.PutObjectResult, error) {
-	url := c.GetBaseUri() + bucketname + DELIMITER + objectname
+	url := c.GetUploadURL() + bucketname + DELIMITER + objectname
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
@@ -482,17 +547,17 @@ headers *map[string]string) (*Model.PutObjectResult, error) {
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
-		return nil, err
+		return nil, Model.NewFDSError(err.Error(), -1)
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
-		return nil, err
+		return nil, Model.NewFDSError(err.Error(), -1)
 	}
 	if res.StatusCode == 200 {
 		return Model.NewPutObjectResult(body)
 	} else {
-		return nil, errors.New(string(body))
+		return nil, Model.NewFDSError(string(body), res.StatusCode)
 	}
 }
 
@@ -515,22 +580,22 @@ func (c *FDSClient) Delete_Object(bucketname, objectname string) (bool, error) {
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
-		return false, err
+		return false, Model.NewFDSError(err.Error(), -1)
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
-		return false, err
+		return false, Model.NewFDSError(err.Error(), -1)
 	}
 	if res.StatusCode == 200 {
 		return true, nil
 	} else {
-		return false, errors.New(string(body))
+		return false, Model.NewFDSError(string(body), res.StatusCode)
 	}
 }
 
 func (c *FDSClient) Rename_Object(bucketname, src_objectname, dst_objectname string) (bool, error) {
-	url := c.GetBaseUri() + bucketname + DELIMITER + src_objectname +
+	url := c.GetUploadURL() + bucketname + DELIMITER + src_objectname +
 		"?renameTo=" + dst_objectname
 	auth := FDSAuth{
 		UrlBase:          url,
@@ -542,22 +607,22 @@ func (c *FDSClient) Rename_Object(bucketname, src_objectname, dst_objectname str
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
-		return false, err
+		return false, Model.NewFDSError(err.Error(), -1)
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
-		return false, err
+		return false, Model.NewFDSError(err.Error(), -1)
 	}
 	if res.StatusCode == 200 {
 		return true, nil
 	} else {
-		return false, errors.New(string(body))
+		return false, Model.NewFDSError(string(body), res.StatusCode)
 	}
 }
 
 func (c *FDSClient) Prefetch_Object(bucketname, objectname string) (bool, error) {
-	url := c.GetBaseUri() + bucketname + DELIMITER + objectname + "?prefetch"
+	url := c.GetUploadURL() + bucketname + DELIMITER + objectname + "?prefetch"
 	auth := FDSAuth{
 		UrlBase:          url,
 		Method:       "PUT",
@@ -568,22 +633,22 @@ func (c *FDSClient) Prefetch_Object(bucketname, objectname string) (bool, error)
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
-		return false, err
+		return false, Model.NewFDSError(err.Error(), -1)
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
-		return false, err
+		return false, Model.NewFDSError(err.Error(), -1)
 	}
 	if res.StatusCode == 200 {
 		return true, nil
 	} else {
-		return false, errors.New(string(body))
+		return false, Model.NewFDSError(string(body), res.StatusCode)
 	}
 }
 
 func (c *FDSClient) Refresh_Object(bucketname, objectname string) (bool, error) {
-	url := c.GetBaseUri() + bucketname + DELIMITER + objectname + "?refresh"
+	url := c.GetUploadURL() + bucketname + DELIMITER + objectname + "?refresh"
 	auth := FDSAuth{
 		UrlBase:          url,
 		Method:       "PUT",
@@ -594,17 +659,17 @@ func (c *FDSClient) Refresh_Object(bucketname, objectname string) (bool, error) 
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
-		return false, err
+		return false, Model.NewFDSError(err.Error(), -1)
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
-		return false, err
+		return false, Model.NewFDSError(err.Error(), -1)
 	}
 	if res.StatusCode == 200 {
 		return true, nil
 	} else {
-		return false, errors.New(string(body))
+		return false, Model.NewFDSError(string(body), res.StatusCode)
 	}
 }
 
@@ -613,7 +678,7 @@ func (c *FDSClient) Set_Object_Acl(bucketname, objectname string, acl map[string
 	acp["owner"] = map[string]string{"id": c.AppKey}
 	acp["accessControlList"] = []interface{}{acl}
 	jsonString, _ := json.Marshal(acp)
-	url := c.GetBaseUri() + bucketname + DELIMITER + objectname + "?acl"
+	url := c.GetUploadURL() + bucketname + DELIMITER + objectname + "?acl"
 	auth := FDSAuth{
 		UrlBase:          url,
 		Method:       "PUT",
@@ -624,17 +689,17 @@ func (c *FDSClient) Set_Object_Acl(bucketname, objectname string, acl map[string
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
-		return false, err
+		return false, Model.NewFDSError(err.Error(), -1)
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
-		return false, err
+		return false, Model.NewFDSError(err.Error(), -1)
 	}
 	if res.StatusCode == 200 {
 		return true, nil
 	} else {
-		return false, errors.New(string(body))
+		return false, Model.NewFDSError(string(body), res.StatusCode)
 	}
 }
 
@@ -650,19 +715,19 @@ func (c *FDSClient) Set_Public(bucketname, objectname string, disable_prefetch b
 	// result := Set_Object_Acl(bucketname, objectname, acl)
 	_, err := c.Set_Object_Acl(bucketname, objectname, grant)
 	if err != nil {
-		return false, err
+		return false, Model.NewFDSError(err.Error(), -1)
 	}
 	if !disable_prefetch {
 		_, err := c.Prefetch_Object(bucketname, objectname)
 		if err != nil {
-			return false, err
+			return false, Model.NewFDSError(err.Error(), -1)
 		}
 	}
 	return true, nil
 }
 
 func (c *FDSClient) Init_MultiPart_Upload(bucketname, objectname string, contentType string) (*Model.InitMultipartUploadResult, error) {
-	url := c.GetBaseUri() + bucketname + DELIMITER + objectname
+	url := c.GetUploadURL() + bucketname + DELIMITER + objectname
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
@@ -680,15 +745,15 @@ func (c *FDSClient) Init_MultiPart_Upload(bucketname, objectname string, content
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
-		return nil, err
+		return nil, Model.NewFDSError(err.Error(), -1)
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
-		return nil, err
+		return nil, Model.NewFDSError(err.Error(), -1)
 	}
 	if res.StatusCode != 200 {
-		return nil, errors.New(string(body))
+		return nil, Model.NewFDSError(string(body), res.StatusCode)
 	}
 
 	return Model.NewInitMultipartUploadResult(body)
@@ -698,7 +763,7 @@ func (c *FDSClient) Upload_Part(initUploadPartResult *Model.InitMultipartUploadR
 	bucketname := initUploadPartResult.BucketName
 	objectname := initUploadPartResult.ObjectName
 	uploadId   := initUploadPartResult.UploadId
-	url := c.GetBaseUri() + bucketname + DELIMITER + objectname
+	url := c.GetUploadURL() + bucketname + DELIMITER + objectname
 	auth := FDSAuth{
 		UrlBase:      url,
 		Method:       "PUT",
@@ -712,16 +777,16 @@ func (c *FDSClient) Upload_Part(initUploadPartResult *Model.InitMultipartUploadR
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
-		return nil, err
+		return nil, Model.NewFDSError(err.Error(), -1)
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
 
 	if err != nil {
-		return nil, err
+		return nil, Model.NewFDSError(err.Error(), -1)
 	}
 	if res.StatusCode != 200 {
-		return nil, errors.New(string(body))
+		return nil, Model.NewFDSError(string(body), res.StatusCode)
 	}
 	return Model.NewUploadPartResult(body)
 }
@@ -731,10 +796,10 @@ uploadPartResultList *Model.UploadPartList) (*Model.PutObjectResult, error) {
 	bucketName := initPartuploadResult.BucketName
 	objectName := initPartuploadResult.ObjectName
 	uploadId := initPartuploadResult.UploadId
-	url := c.GetBaseUri() + bucketName + DELIMITER + objectName
+	url := c.GetUploadURL() + bucketName + DELIMITER + objectName
 	uploadPartResultListByteArray, err := json.Marshal(*uploadPartResultList)
 	if err != nil {
-		return nil, err
+		return nil, Model.NewFDSError(err.Error(), -1)
 	}
 	auth := FDSAuth{
 		UrlBase:          url,
@@ -748,19 +813,49 @@ uploadPartResultList *Model.UploadPartList) (*Model.PutObjectResult, error) {
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
-		return nil, err
+		return nil, Model.NewFDSError(err.Error(), -1)
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
-		return nil, err
+		return nil, Model.NewFDSError(err.Error(), -1)
 	}
 	if res.StatusCode != 200 {
-		return nil, errors.New(string(body))
+		return nil, Model.NewFDSError(string(body), res.StatusCode)
 	}
 	return Model.NewPutObjectResult(body)
 }
 
+
+func (c *FDSClient) Abort_MultipartUpload(initPartuploadResult *Model.InitMultipartUploadResult) error {
+	bucketName := initPartuploadResult.BucketName
+	objectName := initPartuploadResult.ObjectName
+	uploadId := initPartuploadResult.UploadId
+	url := c.GetUploadURL() + bucketName + DELIMITER + objectName
+	auth := FDSAuth{
+		UrlBase:      url,
+		Method:       "DELETE",
+		Data:         nil,
+		Content_Md5:  "",
+		Headers:      nil,
+		Params:       &map[string]string {
+			"uploadId": uploadId,
+		},
+	}
+	res, err := c.Auth(auth)
+	if err != nil {
+		return Model.NewFDSError(err.Error(), -1)
+	}
+	body, err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		return Model.NewFDSError(err.Error(), -1)
+	}
+	if res.StatusCode != 200 {
+		return Model.NewFDSError(string(body), res.StatusCode)
+	}
+	return nil
+}
 
 func (c *FDSClient) Get_Object_Meta(bucketname, objectname string) (*Model.FDSMetaData, error) {
 	url := c.GetBaseUri() + bucketname +
@@ -774,15 +869,15 @@ func (c *FDSClient) Get_Object_Meta(bucketname, objectname string) (*Model.FDSMe
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
-		return nil, err
+		return nil, Model.NewFDSError(err.Error(), -1)
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
-		return nil, err
+		return nil, Model.NewFDSError(err.Error(), -1)
 	}
 	if res.StatusCode != 200 {
-		return nil, errors.New(string(body))
+		return nil, Model.NewFDSError(string(body), res.StatusCode)
 	}
 	return Model.NewFDSMetaData(res.Header), nil
 }
@@ -794,7 +889,7 @@ expiration int64, headers map[string][]string) (string, error) {
 
 	urlParsed, err := url.Parse(urlStr)
 	if err != nil {
-		return "", err
+		return "", Model.NewFDSError(err.Error(), -1)
 	}
 	params := url.Values{}
 	params.Add(GALAXY_ACCESS_KEY_ID, c.AppKey)
@@ -802,7 +897,7 @@ expiration int64, headers map[string][]string) (string, error) {
 	urlParsed.RawQuery = params.Encode()
 	signature, err := Signature(c.AppSecret, method, urlParsed.String(), headers)
 	if err != nil {
-		return "", err
+		return "", Model.NewFDSError(err.Error(), -1)
 	}
 
 	//params.Add(SIGNATURE, signature)
@@ -811,10 +906,10 @@ expiration int64, headers map[string][]string) (string, error) {
 }
 
 func (c *FDSClient) Delete_Objects(bucketname string, prefix []string) error {
-	url := c.GetBaseUri() + bucketname
+	url := c.GetUploadURL() + bucketname
 	prefixJson, err := json.Marshal(prefix)
 	if err != nil {
-		return err
+		return Model.NewFDSError(err.Error(), -1)
 	}
 	auth := FDSAuth{
 		UrlBase:      url,
@@ -828,15 +923,15 @@ func (c *FDSClient) Delete_Objects(bucketname string, prefix []string) error {
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
-		return err
+		return Model.NewFDSError(err.Error(), -1)
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
-		return err
+		return Model.NewFDSError(err.Error(), -1)
 	}
 	if res.StatusCode != 200 {
-		return errors.New(string(body))
+		return Model.NewFDSError(string(body), res.StatusCode)
 	}
 	return nil
 }
@@ -844,7 +939,7 @@ func (c *FDSClient) Delete_Objects(bucketname string, prefix []string) error {
 func (c *FDSClient) Delete_Objects_With_Prefix(bucketname, prefix string) error {
 	listObjectResult, err := c.List_Object(bucketname, prefix, "", DEFAULT_LIST_MAX_KEYS)
 	if err != nil {
-		return err
+		return Model.NewFDSError(err.Error(), -1)
 	}
 
 	for true {
@@ -855,7 +950,7 @@ func (c *FDSClient) Delete_Objects_With_Prefix(bucketname, prefix string) error 
 
 		err = c.Delete_Objects(bucketname, prefixArray)
 		if err != nil {
-			return err
+			return Model.NewFDSError(err.Error(), -1)
 		}
 
 		if !listObjectResult.Truncated {
@@ -863,7 +958,7 @@ func (c *FDSClient) Delete_Objects_With_Prefix(bucketname, prefix string) error 
 		}
 		listObjectResult, err = c.List_Next_Batch_Of_Objects(listObjectResult)
 		if err != nil {
-			return err
+			return Model.NewFDSError(err.Error(), -1)
 		}
 	}
 

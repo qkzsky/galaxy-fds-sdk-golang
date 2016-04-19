@@ -14,7 +14,7 @@ func NewInitMultipartUploadResult (jsonValue []byte) (*InitMultipartUploadResult
 	var initMultipartUploadResult InitMultipartUploadResult
 	err := json.Unmarshal(jsonValue, &initMultipartUploadResult)
 	if err != nil {
-		return nil, err
+		return nil, NewFDSError(err.Error(), -1)
 	}
 	initMultipartUploadResult.rawJsonValue = jsonValue
 	return &initMultipartUploadResult, nil
@@ -39,7 +39,7 @@ func NewUploadPartResult(jsonValue []byte) (*UploadPartResult, error) {
 	var uploadPartResult UploadPartResult
 	err := json.Unmarshal(jsonValue, &uploadPartResult)
 	if err != nil {
-		return nil, err
+		return nil, NewFDSError(err.Error(), -1)
 	}
 	uploadPartResult.rawJsonValue = jsonValue
 

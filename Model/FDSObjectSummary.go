@@ -19,7 +19,7 @@ func NewFDSObjectSummary(jsonValue []byte) (*FDSObjectSummary, error) {
 	var fdsObjectSummary FDSObjectSummary
 	err := json.Unmarshal(jsonValue, &fdsObjectSummary)
 	if err != nil {
-		return nil, err
+		return nil, NewFDSError(err.Error(), -1)
 	}
 	return &fdsObjectSummary, nil
 }

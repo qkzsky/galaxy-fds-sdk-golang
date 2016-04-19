@@ -1,7 +1,6 @@
 package Model
 
 import (
-	"errors"
 	"strconv"
 	"strings"
 )
@@ -33,7 +32,7 @@ func NewFDSMetaData(rawValue map[string][]string) (*FDSMetaData){
 func (d *FDSMetaData) GetKey(k string) (string, error) {
 	r, ok := d.m[k]
 	if !ok {
-		return "", errors.New("No such meta: " + k)
+		return "", NewFDSError("No such meta: " + k, -1)
 	}
 	if len(r) > 0 {
 		return r[0], nil
@@ -56,7 +55,7 @@ func (d *FDSMetaData) GetCacheControl() (string, error) {
 func (d *FDSMetaData) GetContentLength() (int64, error) {
 	s, err := d.GetKey(ContentLength)
 	if err != nil {
-		return 0, err
+		return 0, NewFDSError(err.Error(), -1)
 	}
 	return strconv.ParseInt(s, 10, 64)
 }
@@ -68,7 +67,7 @@ func (d *FDSMetaData) GetContentMD5() (string, error) {
 func (d *FDSMetaData) GetLastChecked() (int64, error) {
 	s, err := d.GetKey(LastChecked)
 	if err != nil {
-		return 0, err
+		return 0, NewFDSError(err.Error(), -1)
 	}
 	return strconv.ParseInt(s, 10, 64)
 }
@@ -84,7 +83,7 @@ func (d *FDSMetaData) GetRawMetadata() (map[string][]string) {
 func (d *FDSMetaData) GetUploadTime() (int64, error) {
 	s, err := d.GetKey(UploadTime)
 	if err != nil {
-		return 0, err
+		return 0, NewFDSError(err.Error(), -1)
 	}
 	return strconv.ParseInt(s, 10, 64)
 }

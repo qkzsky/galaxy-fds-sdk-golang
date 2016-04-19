@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sort"
 	"bytes"
+	"github.com/Shenjiaqi/galaxy-fds-sdk-golang/Model"
 )
 
 func getDateFromUrl(urlStr string) string {
@@ -84,7 +85,7 @@ var SUB_RESOURCE_MAP = map[string]string {
 func canonicalizeResource(uri string) ([]byte, error) {
 	uriParsed, err := url.Parse(uri)
 	if err != nil {
-		return nil, err
+		return nil, Model.NewFDSError(err.Error(), -1)
 	}
 	var path bytes.Buffer
 	path.Write([]byte(uriParsed.Path))
@@ -159,18 +160,18 @@ func Signature(app_secret, method, u string, headers map[string][]string) (strin
 	}*/
 	ch, err := canonicalizeXiaomiHeaders(headers)
 	if err != nil {
-		return "", err
+		return "", Model.NewFDSError(err.Error(), -1)
 	}
 	string_to_sign.Write(ch)
 	cr, err := canonicalizeResource(u)
 	if err != nil {
-		return "", err
+		return "", Model.NewFDSError(err.Error(), -1)
 	}
 	string_to_sign.Write(cr)
 	h := hmac.New(sha1.New, []byte(app_secret))
 	_, err = h.Write(string_to_sign.Bytes())
 	if err != nil {
-		return "", err
+		return "", Model.NewFDSError(err.Error(), -1)
 	}
 	b := base64.StdEncoding.EncodeToString(h.Sum(nil))
 	return b, nil

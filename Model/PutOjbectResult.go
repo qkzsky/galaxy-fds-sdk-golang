@@ -17,7 +17,7 @@ func NewPutObjectResult (jsonValue []byte) (*PutObjectResult, error){
 	var putObjectResult PutObjectResult
 	err := json.Unmarshal(jsonValue, &putObjectResult)
 	if err != nil {
-		return nil, err
+		return nil, NewFDSError(err.Error(), -1)
 	}
 	putObjectResult.rawJsonValue = jsonValue
 	return &putObjectResult, nil
