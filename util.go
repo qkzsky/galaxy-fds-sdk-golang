@@ -3,7 +3,6 @@ package galaxy_fds_sdk_golang
 import (
 	// "crypto/md5"
 	"encoding/json"
-	sJson "github.com/bitly/go-simplejson"
 	// "io"
 	"errors"
 	"fmt"
@@ -246,12 +245,20 @@ func (c *FDSClient) List_Bucket() ([]string, error) {
 		return bucketlist, Model.NewFDSError(err.Error(), -1)
 	}
 	if res.StatusCode == 200 {
-		sj, err := sJson.NewJson(body)
+		var sj map[string]interface{}
+		err := json.Unmarshal(body, &sj)
 		if err != nil {
 			return bucketlist, Model.NewFDSError(err.Error(), -1)
 		}
-		buckets, _ := sj.Get("buckets").Array()
-		for _, bucket := range buckets {
+		buckets, ok := sj["buckets"]
+		if !ok {
+			return bucketlist, Model.NewFDSError(err.Error(), -1)
+		}
+		bucketsList, ok := buckets.([]interface{})
+		if !ok {
+			return bucketlist, Model.NewFDSError(err.Error(), -1)
+		}
+		for _, bucket := range bucketsList {
 			// fmt.Printf("%#v\n", bucket.(map[string]interface{})["name"])
 			bucket = bucket.(map[string]interface{})["name"]
 			bucketlist = append(bucketlist, bucket.(string))
@@ -448,6 +455,73 @@ func (c *FDSClient) List_Object(bucketname, prefix, delimiter string, maxKeys in
 	}
 }
 
+func (c* FDSClient) List_Multipart_Uploads(bucketName, prefix,
+delimiter string, maxKeys int) (*Model.FDSListMultipartUploadsResult, error) {
+	url := c.GetBaseUri() + bucketName
+	auth := FDSAuth {
+		UrlBase:      url,
+		Method:       "GET",
+		Data:         nil,
+		Content_Md5:  "",
+		Content_Type: "",
+		Headers:      nil,
+		Params:       &map[string]string {
+			"uploads": "",
+			"prefix": prefix,
+			"delimiter": delimiter,
+			"maxKeys": strconv.Itoa(maxKeys),
+		},
+	}
+	res, err := c.Auth(auth)
+	if err != nil {
+		return nil, Model.NewFDSError(err.Error(), -1)
+	}
+	body, err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		return nil, Model.NewFDSError(err.Error(), -1)
+	}
+	if res.StatusCode == 200 {
+		listMultipartUploadsResult, err := Model.NewFDSListMultipartUploadsResult(body)
+		if err != nil {
+			return nil, Model.NewFDSError(err.Error(), -1)
+		}
+		return listMultipartUploadsResult, nil
+	} else {
+		return nil, Model.NewFDSError(string(body), res.StatusCode)
+	}
+}
+
+func (c* FDSClient) List_Parts(bucketName, objectName, uploadId string) (*Model.FDSUploadPartResultList, error){
+	url := c.GetBaseUri() + bucketName + DELIMITER + objectName
+	headers := map[string]string{}
+	auth := FDSAuth{
+		UrlBase:      url,
+		Method:       "GET",
+		Data:         nil,
+		Content_Md5:  "",
+		Content_Type: "",
+		Headers:      &headers,
+		Params:       &map[string]string {
+			"uploadId": uploadId,
+		},
+	}
+	res, err := c.Auth(auth)
+	if err != nil {
+		return nil, Model.NewFDSError(err.Error(), -1)
+	}
+	body, err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		return nil, Model.NewFDSError(err.Error(), -1)
+	}
+	if res.StatusCode == http.StatusOK {
+		return Model.NewFDSUploadPartResultList(body)
+	} else {
+		return nil, Model.NewFDSError(string(body), res.StatusCode)
+	}
+}
+
 func (c *FDSClient) List_Next_Batch_Of_Objects(previous *Model.FDSObjectListing) (*Model.FDSObjectListing, error) {
 	if !previous.Truncated {
 		return nil, errors.New("No more objects")
@@ -517,12 +591,20 @@ func (c *FDSClient) Post_Object(bucketname string, data []byte, filetype string)
 		return "", Model.NewFDSError(err.Error(), -1)
 	}
 	if res.StatusCode == 200 {
-		sj, err := sJson.NewJson(body)
+		var sj map[string]interface{}
+		err := json.Unmarshal(body, &sj)
 		if err != nil {
 			return "", Model.NewFDSError(err.Error(), -1)
 		}
-		objectname, _ := sj.Get("objectName").String()
-		return objectname, nil
+		objectname, ok := sj["objectName"]
+		if !ok {
+			return "", Model.NewFDSError(err.Error(), -1)
+		}
+		objectNameStr, ok := objectname.(string)
+		if !ok {
+			return "", Model.NewFDSError(err.Error(), -1)
+		}
+		return objectNameStr, nil
 	} else {
 		return "", Model.NewFDSError(string(body), res.StatusCode)
 	}
