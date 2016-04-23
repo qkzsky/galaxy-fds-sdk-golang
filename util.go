@@ -492,7 +492,7 @@ delimiter string, maxKeys int) (*Model.FDSListMultipartUploadsResult, error) {
 	}
 }
 
-func (c* FDSClient) List_Parts(bucketName, objectName, uploadId string) (*Model.FDSUploadPartResultList, error){
+func (c* FDSClient) List_Parts(bucketName, objectName, uploadId string) (*Model.UploadPartList, error){
 	url := c.GetBaseUri() + bucketName + DELIMITER + objectName
 	headers := map[string]string{}
 	auth := FDSAuth{
@@ -516,7 +516,7 @@ func (c* FDSClient) List_Parts(bucketName, objectName, uploadId string) (*Model.
 		return nil, Model.NewFDSError(err.Error(), -1)
 	}
 	if res.StatusCode == http.StatusOK {
-		return Model.NewFDSUploadPartResultList(body)
+		return Model.NewUploadPartList(body)
 	} else {
 		return nil, Model.NewFDSError(string(body), res.StatusCode)
 	}

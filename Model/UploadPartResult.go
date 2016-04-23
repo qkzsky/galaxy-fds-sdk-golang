@@ -24,6 +24,15 @@ type UploadPartList struct {
 	UploadPartResultList []UploadPartResult
 }
 
+func NewUploadPartList(jsonValue []byte) (*UploadPartList, error) {
+	var uploadPartList UploadPartList
+	err := json.Unmarshal(jsonValue, &uploadPartList)
+	if err != nil {
+		return nil, NewFDSError(err.Error(), -1)
+	}
+	return &uploadPartList, nil
+}
+
 func (u *UploadPartList) AddUploadPartResult(i *UploadPartResult) {
 	u.UploadPartResultList = append(u.UploadPartResultList, *i)
 }
