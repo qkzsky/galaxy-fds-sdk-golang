@@ -19,6 +19,7 @@ const (
 	APP_KEY = "APP_KEY"
 	SECRET_KEY = "SECRET_KEY"
 	BUCKET_NAME = "go-lang-test"
+	REGION_NAME = ""
 )
 
 func getObjectName4test() string {
@@ -29,7 +30,6 @@ func getObjectName4test() string {
 var client *galaxy_fds_sdk_golang.FDSClient
 
 func Test_Put_Get_Object(t *testing.T) {
-	//t.Skip()
 	objectName := getObjectName4test()
 
 	content := []byte("blah" + time.Now().Format(time.ANSIC))
@@ -49,7 +49,6 @@ func Test_Put_Get_Object(t *testing.T) {
 }
 
 func Test_MultiPartUpload(t *testing.T) {
-	//t.Skip()
 	objectName := getObjectName4test()
 
 	initMultiPartResult, err := client.Init_MultiPart_Upload(BUCKET_NAME, objectName, "")
@@ -119,7 +118,6 @@ func Test_MultiPartUpload(t *testing.T) {
 }
 
 func Test_ListObjects(t *testing.T) {
-	//t.Skip()
 	objectName := []string{
 	"aaa/bbb/ccc/file1",
 	"aaa/bbb/ccc/file2",
@@ -179,7 +177,6 @@ func Test_ListObjects(t *testing.T) {
 }
 
 func Test_DeleteObject (t *testing.T) {
-	//t.Skip()
 	objectName := getObjectName4test()
 	objectContent := "blah"
 
@@ -212,7 +209,6 @@ func Test_DeleteObject (t *testing.T) {
 }
 
 func Test_Metadata (t *testing.T) {
-	//t.Skip()
 	objectName := getObjectName4test()
 	objectContent := "blah"
 	contentType := "xxx/yyy"
@@ -260,7 +256,6 @@ func Test_Metadata (t *testing.T) {
 }
 
 func Test_Presigned_Url(t *testing.T) {
-	//t.Skip()
 	objectName := getObjectName4test()
 	objectContent := "blah"
 	contentType := "text/plain"
@@ -324,7 +319,6 @@ func Test_Presigned_Url(t *testing.T) {
 
 
 func Test_List_Multipart_uploads(t *testing.T) {
-	//t.Skip()
 	objectName := getObjectName4test()
 	objectContent := "blah"
 	contentType := "text/plain"
@@ -391,7 +385,7 @@ func tearDown() {
 
 func TestMain(m *testing.M) {
 	client = galaxy_fds_sdk_golang.NEWFDSClient(APP_KEY, SECRET_KEY,
-		"staging",
+		REGION_NAME,
 		false, false)
 	setUpTest()
 	r := m.Run()
