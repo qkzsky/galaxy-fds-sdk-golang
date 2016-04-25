@@ -2,11 +2,11 @@ package Test
 
 import (
 	"testing"
-	"github.com/Shenjiaqi/galaxy-fds-sdk-golang"
+	"github.com/XiaoMi/galaxy-fds-sdk-golang"
 	"bytes"
 	"runtime"
 	"time"
-	"github.com/Shenjiaqi/galaxy-fds-sdk-golang/Model"
+	"github.com/XiaoMi/galaxy-fds-sdk-golang/Model"
 	"fmt"
 	"strings"
 	"os"

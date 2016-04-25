@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"strings"
 	"bytes"
-	"github.com/Shenjiaqi/galaxy-fds-sdk-golang/Model"
+	"github.com/Xiaomi/galaxy-fds-sdk-golang/Model"
 	"time"
 	"crypto/md5"
 	"net/url"
