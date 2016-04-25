@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sort"
 	"bytes"
-	"github.com/Xiaomi/galaxy-fds-sdk-golang/Model"
+	"github.com/XiaoMi/galaxy-fds-sdk-golang/Model"
 )
 
 func getDateFromUrl(urlStr string) string {
