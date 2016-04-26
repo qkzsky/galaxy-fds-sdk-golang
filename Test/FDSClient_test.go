@@ -313,7 +313,29 @@ func Test_Presigned_Url(t *testing.T) {
 		t.Error("Fail to close response")
 	}
 	if strings.Compare(string(body), objectContent) != 0 {
-		t.Error("object content changed")
+		t.Error(fmt.Sprintf("object content changed, expect: %s, got: %s", objectContent, string(body)))
+	}
+
+	url, err = client.Generate_Presigned_URI(BUCKET_NAME, objectName,
+		"HEAD",
+		time.Now().Add(time.Minute * 5).UnixNano() / int64(time.Millisecond),
+		map[string][]string{})
+
+	req, err = http.NewRequest("HEAD", url, nil)
+	if err != nil {
+		t.Error("Fail to allocate new request", err)
+	}
+
+	res, err = c.Do(req)
+	if err != nil {
+		t.Error("Fail to execute request", err)
+	}
+
+	fmt.Printf("%v\n", res.Header)
+
+	contentLength, err := strconv.Atoi(res.Header.Get("content-length"))
+	if (contentLength != len(objectContent)) {
+		t.Error(fmt.Sprintf("content length check fail, expect: %d, got: %d", len(objectContent), contentLength))
 	}
 }
 

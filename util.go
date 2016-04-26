@@ -187,7 +187,7 @@ func (c *FDSClient) Auth(auth FDSAuth) (*http.Response, error) {
 
 	signature, err := Signature(c.AppSecret, req.Method, urlStr, req.Header)
 	if err != nil {
-		return nil, Model.NewFDSError(err.Error(), -1)
+		return nil, err
 	}
 
 	req.Header.Add("authorization", fmt.Sprintf("Galaxy-V2 %s:%s", c.AppKey, signature))
@@ -859,7 +859,7 @@ func (c *FDSClient) Upload_Part(initUploadPartResult *Model.InitMultipartUploadR
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
-		return nil, Model.NewFDSError(err.Error(), -1)
+		return nil, err
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
@@ -974,6 +974,9 @@ expiration int64, headers map[string][]string) (string, error) {
 		return "", Model.NewFDSError(err.Error(), -1)
 	}
 	params := url.Values{}
+	if method == "HEAD" {
+		params.Add("metadata", "");
+	}
 	params.Add(GALAXY_ACCESS_KEY_ID, c.AppKey)
 	params.Add(EXPIRES, fmt.Sprintf("%d", expiration))
 	urlParsed.RawQuery = params.Encode()
