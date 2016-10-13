@@ -2,7 +2,7 @@
 Golang SDK for Xiaomi File Data Storage.
 # install
 ```
-go get github.com/Shenjiaqi/galaxy-fds-sdk-golang
+go get github.com/XiaoMi/galaxy-fds-sdk-golang
 ```
 #example
 ```
@@ -10,7 +10,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/Shenjiaqi/galaxy-fds-sdk-golang"
+	"github.com/XiaoMi/galaxy-fds-sdk-golang"
 )
 
 const (
