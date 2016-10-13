@@ -21,9 +21,8 @@ import (
 
 const (
 	URI_CDN                            = "cdn"
-	URI_FILES                          = "files"
 	URI_FDS_SUFFIX                     = ".fds.api.xiaomi.com/"
-	URI_FDS_SSL_SUFFIX                 = ".fds-ssl.api.xiaomi.com/"
+	URI_FDS_CDN_SUFFIX                 = ".fds.api.mi-img.com/"
 	URI_HTTP_PREFIX                    = "http://"
 	URI_HTTPS_PREFIX                   = "https://"
 	USER_DEFINED_METADATA_PREFIX       = "x-xiaomi-meta-"
@@ -44,7 +43,9 @@ const (
 )
 
 const (
-	REGION_CNBJ0 = ""
+	REGION_CNBJ0 = "cnbj0"
+	REGION_CNBJ1 = "cnbj1"
+	REGION_CNBJ2 = "cnbj2"
 	REGION_AWSBJ0 = "awsbj0"
 	REGION_AWSUSOR0 = "awsusor0"
 	REGION_AWSSGP0 = "awssgp0"
@@ -65,6 +66,7 @@ type FDSClient struct {
 	AppKey     string
 	AppSecret  string
 	RegionName string
+        EndPoint string
 	EnableHttps bool
 	EnableCDN  bool
 }
@@ -80,37 +82,34 @@ type FDSAuth struct {
 }
 
 
-func NEWFDSClient(appkey, appSecret, regionName string, enableHttps, enableCDN bool) *FDSClient {
+func NEWFDSClient(appkey, appSecret, regionName string, endPoint string, enableHttps, enableCDN bool) *FDSClient {
+	if len(regionName) == 0 &&  len(endPoint) == 0 {
+		// default to cnbj0
+		regionName = REGION_CNBJ0
+	}
+
 	return &FDSClient {
 		AppKey: appkey,
 		AppSecret: appSecret,
 		RegionName: regionName,
+                EndPoint: endPoint,
 		EnableHttps: enableHttps,
 		EnableCDN: enableCDN,
 	}
 }
 
 func (c *FDSClient) getBaseUriPrefix() string {
-	if len(c.RegionName) == 0 {
-		if c.EnableCDN {
-			return URI_CDN
-		}
-		return URI_FILES
-	}
 	if c.EnableCDN {
-		return c.RegionName + "-" + URI_CDN;
+                return URI_CDN + "." + c.RegionName;
 	}
-	return c.RegionName + "-" + URI_FILES;
+	return c.RegionName;
 }
 
 func (c *FDSClient) getUploadUriPrefix() string {
-	if len(c.RegionName) == 0 {
-		return URI_FILES
-	}
 	if c.EnableCDN {
-		return c.RegionName + "-" + URI_CDN;
+		return URI_CDN + "." + c.RegionName;
 	}
-	return c.RegionName + "-" + URI_FILES;
+	return c.RegionName;
 }
 
 func (c *FDSClient) getUploadUriSuffix () string {
@@ -118,8 +117,8 @@ func (c *FDSClient) getUploadUriSuffix () string {
 }
 
 func (c *FDSClient) getBaseUriSuffix () string {
-	if c.EnableCDN && c.EnableHttps {
-		return URI_FDS_SSL_SUFFIX
+	if c.EnableCDN {
+		return URI_FDS_CDN_SUFFIX
 	}
 	return URI_FDS_SUFFIX
 }
@@ -132,8 +131,13 @@ func (c *FDSClient) GetBaseUri() string {
 		u.WriteString(URI_HTTP_PREFIX)
 	}
 
-	u.WriteString(c.getBaseUriPrefix())
-	u.WriteString(c.getBaseUriSuffix())
+        if len(c.EndPoint) > 0 {
+               u.WriteString(c.EndPoint)
+               u.WriteString("/")
+        } else {
+	       u.WriteString(c.getBaseUriPrefix())
+	       u.WriteString(c.getBaseUriSuffix())
+        }
 	return u.String()
 }
 
@@ -145,8 +149,13 @@ func (c *FDSClient) GetUploadURL() string {
 		u.WriteString(URI_HTTP_PREFIX)
 	}
 
-	u.WriteString(c.getUploadUriPrefix())
-	u.WriteString(c.getUploadUriSuffix())
+        if len(c.EndPoint) > 0 {
+              u.WriteString(c.EndPoint)
+              u.WriteString("/")
+        } else {
+	      u.WriteString(c.getUploadUriPrefix())
+	      u.WriteString(c.getUploadUriSuffix())
+        }
 	return u.String()
 }
 

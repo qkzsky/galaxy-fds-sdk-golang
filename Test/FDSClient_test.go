@@ -20,6 +20,7 @@ const (
 	SECRET_KEY = "SECRET_KEY"
 	BUCKET_NAME = "go-lang-test"
 	REGION_NAME = ""
+	ENDPOINT = "cnbj0"
 )
 
 func getObjectName4test() string {
@@ -103,18 +104,15 @@ func Test_MultiPartUpload(t *testing.T) {
 		t.Error("Fail to abort multipart upload")
 	}
 
-	var uploadPartList1 Model.UploadPartList
 	u, err := client.Upload_Part(initMultiPartResult, 0, content[0])
+	if u != nil {
+		t.Error("Upload part succ after abort")
+	}
+
 	/* TODO fds do not claim failure
 	if err == nil {
 		t.Error("Abort_Multipart_Upload fail to clean up")
 	}*/
-
-	uploadPartList1.AddUploadPartResult(u)
-	_, err = client.Complete_Multipart_Upload(initMultiPartResult, &uploadPartList1)
-	if err == nil {
-		t.Error("Abort_Multipart_Upload fail to clean up")
-	}
 }
 
 func Test_ListObjects(t *testing.T) {
@@ -408,6 +406,7 @@ func tearDown() {
 func TestMain(m *testing.M) {
 	client = galaxy_fds_sdk_golang.NEWFDSClient(APP_KEY, SECRET_KEY,
 		REGION_NAME,
+                ENDPOINT,
 		false, false)
 	setUpTest()
 	r := m.Run()
