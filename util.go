@@ -1,22 +1,23 @@
 package galaxy_fds_sdk_golang
 
 import (
-	// "crypto/md5"
+	"bufio"
+	"bytes"
+	"crypto/md5"
 	"encoding/json"
-	// "io"
 	"errors"
 	"fmt"
+	"github.com/XiaoMi/galaxy-fds-sdk-golang/Model"
+	"io"
 	"io/ioutil"
+	"math"
 	"mime"
 	"net/http"
-	"strings"
-	"bytes"
-	"github.com/XiaoMi/galaxy-fds-sdk-golang/Model"
-	"time"
-	"crypto/md5"
 	"net/url"
+	"os"
 	"strconv"
-	"io"
+	"strings"
+	"time"
 )
 
 const (
@@ -31,6 +32,7 @@ const (
 	GALAXY_ACCESS_KEY_ID               = "GalaxyAccessKeyId"
 	EXPIRES                            = "Expires"
 	SIGNATURE                          = "Signature"
+	SLICE_SIZE                   int64 = 52428800 // 50*1024*1024 下载时分片上限为50MB，低于50MB不可分片
 )
 
 // permission
@@ -43,13 +45,13 @@ const (
 )
 
 const (
-	REGION_CNBJ0 = "cnbj0"
-	REGION_CNBJ1 = "cnbj1"
-	REGION_CNBJ2 = "cnbj2"
-	REGION_AWSBJ0 = "awsbj0"
+	REGION_CNBJ0    = "cnbj0"
+	REGION_CNBJ1    = "cnbj1"
+	REGION_CNBJ2    = "cnbj2"
+	REGION_AWSBJ0   = "awsbj0"
 	REGION_AWSUSOR0 = "awsusor0"
-	REGION_AWSSGP0 = "awssgp0"
-	REGION_AWSDE0 = "awsde0"
+	REGION_AWSSGP0  = "awssgp0"
+	REGION_AWSDE0   = "awsde0"
 )
 
 var ALL_USERS = map[string]string{"id": "ALL_USERS"}
@@ -63,12 +65,12 @@ var PRE_DEFINED_METADATA = []string{"cache-control",
 }
 
 type FDSClient struct {
-	AppKey     string
-	AppSecret  string
-	RegionName string
-        EndPoint string
+	AppKey      string
+	AppSecret   string
+	RegionName  string
+	EndPoint    string
 	EnableHttps bool
-	EnableCDN  bool
+	EnableCDN   bool
 }
 
 type FDSAuth struct {
@@ -81,42 +83,41 @@ type FDSAuth struct {
 	Params       *map[string]string
 }
 
-
 func NEWFDSClient(appkey, appSecret, regionName string, endPoint string, enableHttps, enableCDN bool) *FDSClient {
-	if len(regionName) == 0 &&  len(endPoint) == 0 {
+	if len(regionName) == 0 && len(endPoint) == 0 {
 		// default to cnbj0
 		regionName = REGION_CNBJ0
 	}
 
-	return &FDSClient {
-		AppKey: appkey,
-		AppSecret: appSecret,
-		RegionName: regionName,
-                EndPoint: endPoint,
+	return &FDSClient{
+		AppKey:      appkey,
+		AppSecret:   appSecret,
+		RegionName:  regionName,
+		EndPoint:    endPoint,
 		EnableHttps: enableHttps,
-		EnableCDN: enableCDN,
+		EnableCDN:   enableCDN,
 	}
 }
 
 func (c *FDSClient) getBaseUriPrefix() string {
 	if c.EnableCDN {
-                return URI_CDN + "." + c.RegionName;
+		return URI_CDN + "." + c.RegionName
 	}
-	return c.RegionName;
+	return c.RegionName
 }
 
 func (c *FDSClient) getUploadUriPrefix() string {
 	if c.EnableCDN {
-		return URI_CDN + "." + c.RegionName;
+		return URI_CDN + "." + c.RegionName
 	}
-	return c.RegionName;
+	return c.RegionName
 }
 
-func (c *FDSClient) getUploadUriSuffix () string {
+func (c *FDSClient) getUploadUriSuffix() string {
 	return URI_FDS_SUFFIX
 }
 
-func (c *FDSClient) getBaseUriSuffix () string {
+func (c *FDSClient) getBaseUriSuffix() string {
 	if c.EnableCDN {
 		return URI_FDS_CDN_SUFFIX
 	}
@@ -131,13 +132,13 @@ func (c *FDSClient) GetBaseUri() string {
 		u.WriteString(URI_HTTP_PREFIX)
 	}
 
-        if len(c.EndPoint) > 0 {
-               u.WriteString(c.EndPoint)
-               u.WriteString("/")
-        } else {
-	       u.WriteString(c.getBaseUriPrefix())
-	       u.WriteString(c.getBaseUriSuffix())
-        }
+	if len(c.EndPoint) > 0 {
+		u.WriteString(c.EndPoint)
+		u.WriteString("/")
+	} else {
+		u.WriteString(c.getBaseUriPrefix())
+		u.WriteString(c.getBaseUriSuffix())
+	}
 	return u.String()
 }
 
@@ -149,27 +150,25 @@ func (c *FDSClient) GetUploadURL() string {
 		u.WriteString(URI_HTTP_PREFIX)
 	}
 
-        if len(c.EndPoint) > 0 {
-              u.WriteString(c.EndPoint)
-              u.WriteString("/")
-        } else {
-	      u.WriteString(c.getUploadUriPrefix())
-	      u.WriteString(c.getUploadUriSuffix())
-        }
+	if len(c.EndPoint) > 0 {
+		u.WriteString(c.EndPoint)
+		u.WriteString("/")
+	} else {
+		u.WriteString(c.getUploadUriPrefix())
+		u.WriteString(c.getUploadUriSuffix())
+	}
 	return u.String()
 }
 
-
 func (c *FDSClient) Auth(auth FDSAuth) (*http.Response, error) {
-	client := &http.Client{
-	}
+	client := &http.Client{}
 
 	urlParsed, err := url.Parse(auth.UrlBase)
 	if err != nil {
 		return nil, Model.NewFDSError(err.Error(), -1)
 	}
 	params := url.Values{}
-	for k, v := range(urlParsed.Query()) {
+	for k, v := range urlParsed.Query() {
 		if len(v) > 0 {
 			params.Add(k, v[0])
 		} else {
@@ -177,7 +176,7 @@ func (c *FDSClient) Auth(auth FDSAuth) (*http.Response, error) {
 		}
 	}
 	if auth.Params != nil {
-		for k, v := range (*auth.Params) {
+		for k, v := range *auth.Params {
 			params.Add(k, v)
 		}
 	}
@@ -207,10 +206,50 @@ func (c *FDSClient) Auth(auth FDSAuth) (*http.Response, error) {
 	return res, nil
 }
 
+//name:
+//     Get_Bucket
+//param:
+//     bucketname: 要获取信息的bucket名字
+//return:
+//     *Model.BucketInfo: 由bucketinfo结构体，包含bucket相关信息
+//     error: 正常返回nil，异常返回error Code
+//example:
+//     Not available now
+//Exception: 这个接口跟java中定义不同，请谨慎使用，java中不返回任何值
+func (c *FDSClient) Get_Bucket(bucketname string) (*Model.BucketInfo, error) {
+	url := c.GetBaseUri() + bucketname
+	auth := FDSAuth{
+		UrlBase:      url,
+		Method:       "GET",
+		Data:         nil,
+		Content_Md5:  "",
+		Content_Type: "",
+		Headers:      nil,
+	}
+	res, err := c.Auth(auth)
+	if err != nil {
+		return nil, Model.NewFDSError(err.Error(), -1)
+	}
+	body, err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		return nil, Model.NewFDSError(err.Error(), -1)
+	}
+	if res.StatusCode == 200 {
+		bucketInfo, err := Model.NewBucketInfo(body)
+		if err != nil {
+			return nil, Model.NewFDSError(err.Error(), -1)
+		}
+		return bucketInfo, nil
+	} else {
+		return nil, Model.NewFDSError(string(body), res.StatusCode)
+	}
+}
+
 func (c *FDSClient) Is_Bucket_Exists(bucketname string) (bool, error) {
 	url := c.GetBaseUri() + bucketname
 	auth := FDSAuth{
-		UrlBase:          url,
+		UrlBase:      url,
 		Method:       "HEAD",
 		Data:         nil,
 		Content_Md5:  "",
@@ -233,11 +272,20 @@ func (c *FDSClient) Is_Bucket_Exists(bucketname string) (bool, error) {
 	}
 }
 
+//name:
+//     List_Bucket
+//param:
+//     默认不使用任何参数，使用用户配置的AK SK，列出由该AK SK所属用户组创建的bucket
+//return:
+//     []string: 由bucket name组成的slice
+//     error: 正常返回nil，异常返回error Code
+//example:
+//     Not available now
 func (c *FDSClient) List_Bucket() ([]string, error) {
 	bucketlist := []string{}
 	url := c.GetBaseUri()
 	auth := FDSAuth{
-		UrlBase:          url,
+		UrlBase:      url,
 		Method:       "GET",
 		Data:         nil,
 		Content_Md5:  "",
@@ -254,6 +302,68 @@ func (c *FDSClient) List_Bucket() ([]string, error) {
 		return bucketlist, Model.NewFDSError(err.Error(), -1)
 	}
 	if res.StatusCode == 200 {
+		var sj map[string]interface{}
+		// 修复因为返回值为空导致json解析失败问题
+		if string(body) == "" {
+			return bucketlist, nil
+		}
+		err := json.Unmarshal(body, &sj)
+		if err != nil {
+			return bucketlist, Model.NewFDSError(err.Error(), -1)
+		}
+		buckets, ok := sj["buckets"]
+		if !ok {
+			return bucketlist, Model.NewFDSError(err.Error(), -1)
+		}
+		bucketsList, ok := buckets.([]interface{})
+		if !ok {
+			return bucketlist, Model.NewFDSError(err.Error(), -1)
+		}
+		for _, bucket := range bucketsList {
+			// fmt.Printf("%#v\n", bucket.(map[string]interface{})["name"])
+			bucket = bucket.(map[string]interface{})["name"]
+			bucketlist = append(bucketlist, bucket.(string))
+		}
+		return bucketlist, nil
+	} else {
+		return bucketlist, Model.NewFDSError(string(body), res.StatusCode)
+	}
+}
+
+//name:
+//     List_Authorized_Buckets
+//param:
+//     默认不使用任何参数，使用用户配置的AK SK，列出由该AK SK所属用户组所有被授权的bucket
+//return:
+//     []string: 由bucket name组成的slice
+//     error: 正常返回nil，异常返回error Code
+//example:
+//     Not available now
+func (c *FDSClient) List_Authorized_Buckets() ([]string, error) {
+	bucketlist := []string{}
+	url := c.GetBaseUri() + "?authorizedBuckets"
+	auth := FDSAuth{
+		UrlBase:      url,
+		Method:       "GET",
+		Data:         nil,
+		Content_Md5:  "",
+		Content_Type: "",
+		Headers:      nil,
+	}
+	res, err := c.Auth(auth)
+	if err != nil {
+		return bucketlist, Model.NewFDSError(err.Error(), -1)
+	}
+	body, err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		return bucketlist, Model.NewFDSError(err.Error(), -1)
+	}
+	if res.StatusCode == 200 {
+		// 修复因为返回值为空导致json解析失败问题
+		if string(body) == "" {
+			return bucketlist, nil
+		}
 		var sj map[string]interface{}
 		err := json.Unmarshal(body, &sj)
 		if err != nil {
@@ -281,7 +391,7 @@ func (c *FDSClient) List_Bucket() ([]string, error) {
 func (c *FDSClient) Create_Bucket(bucketname string) (bool, error) {
 	url := c.GetUploadURL() + bucketname
 	auth := FDSAuth{
-		UrlBase:          url,
+		UrlBase:      url,
 		Method:       "PUT",
 		Data:         nil,
 		Content_Md5:  "",
@@ -307,7 +417,7 @@ func (c *FDSClient) Create_Bucket(bucketname string) (bool, error) {
 func (c *FDSClient) Delete_Bucket(bucketname string) (bool, error) {
 	url := c.GetBaseUri() + bucketname
 	auth := FDSAuth{
-		UrlBase:          url,
+		UrlBase:      url,
 		Method:       "DELETE",
 		Data:         nil,
 		Content_Md5:  "",
@@ -333,7 +443,7 @@ func (c *FDSClient) Delete_Bucket(bucketname string) (bool, error) {
 func (c *FDSClient) Is_Object_Exists(bucketname, objectname string) (bool, error) {
 	url := c.GetBaseUri() + bucketname + DELIMITER + objectname
 	auth := FDSAuth{
-		UrlBase:          url,
+		UrlBase:      url,
 		Method:       "HEAD",
 		Data:         nil,
 		Content_Md5:  "",
@@ -358,6 +468,19 @@ func (c *FDSClient) Is_Object_Exists(bucketname, objectname string) (bool, error
 	}
 }
 
+//name:
+//     Get_Object
+//     获取指定的object
+//param:
+//     bucketname: 要获取object所属的bucketname
+//     objectname: 要获取object的name
+//     position:   指定要获取object的其实位置
+//     size:       指定要获取object内容的大小，-1位最大，值必须为正数
+//return:
+//     *FDSObject: 返回与object相关信息
+//     error:      正常返回nil，异常返回error Code
+//example:
+//     Not available now
 func (c *FDSClient) Get_Object(bucketname, objectname string, position int64, size int64) (*Model.FDSObject, error) {
 	if position < 0 {
 		return nil, Model.NewFDSError("Seek position should be no less than 0", -1)
@@ -366,8 +489,12 @@ func (c *FDSClient) Get_Object(bucketname, objectname string, position int64, si
 	headers := map[string]string{}
 	if position >= 0 && size < 0 {
 		headers["range"] = fmt.Sprintf("bytes=%d-", position)
-	} else if position > 0 && size > 0 {
-		headers["range"] = fmt.Sprintf("bytes=%d-%d", position, position + size - 1)
+	} else if position >= 0 && size > 0 {
+		headers["range"] = fmt.Sprintf("bytes=%d-%d", position, position+size-1)
+	} else if position >= 0 && size == 0 {
+		return nil, Model.NewFDSError("Request size should be larger than 0", -1)
+	} else {
+		return nil, Model.NewFDSError("position or size set error", -1)
 	}
 	auth := FDSAuth{
 		UrlBase:      url,
@@ -388,14 +515,31 @@ func (c *FDSClient) Get_Object(bucketname, objectname string, position int64, si
 	}
 	if res.StatusCode == http.StatusOK || res.StatusCode == http.StatusPartialContent {
 		return &Model.FDSObject{
-			BucketName: bucketname,
-			ObjectName: objectname,
-			Metadata:   *Model.NewFDSMetaData(res.Header),
+			BucketName:    bucketname,
+			ObjectName:    objectname,
+			Metadata:      *Model.NewFDSMetaData(res.Header),
 			ObjectContent: body,
 		}, nil
 	} else {
 		return nil, Model.NewFDSError(string(body), res.StatusCode)
 	}
+}
+
+//name:
+//     Get_Object_With_Uri
+//     获取使用uri标识的object
+//param:
+//     uri:      包含要获取object名字的uri，格式为：fds://
+//     position: 指定获取object的起始位置
+//     size:     指定要获取object内容的大小
+//return:
+//     *FDSObject: 返回与object相关信息
+//     error:      正常返回nil，异常返回error Code
+//example:
+//     Not available now
+func (c *FDSClient) Get_Object_With_Uri(uri string, position, size int64) (*Model.FDSObject, error) {
+	bucketName, objectName := Uri_To_Bucket_And_Object(uri)
+	return c.Get_Object(bucketName, objectName, position, size)
 }
 
 func (c *FDSClient) Get_Object_Reader(bucketname, objectname string, position int64, size int64) (*io.ReadCloser, error) {
@@ -404,10 +548,14 @@ func (c *FDSClient) Get_Object_Reader(bucketname, objectname string, position in
 	}
 	url := c.GetBaseUri() + bucketname + DELIMITER + objectname
 	headers := map[string]string{}
-	if position > 0 && size < 0 {
+	if position >= 0 && size < 0 {
 		headers["range"] = fmt.Sprintf("bytes=%d-", position)
-	} else if position > 0 && size > 0 {
-		headers["range"] = fmt.Sprintf("bytes=%d-%d", position, position + size - 1)
+	} else if position >= 0 && size > 0 {
+		headers["range"] = fmt.Sprintf("bytes=%d-%d", position, position+size-1)
+	} else if position >= 0 && size == 0 {
+		return nil, Model.NewFDSError("Request size should be larger than 0", -1)
+	} else {
+		return nil, Model.NewFDSError("position or size set error", -1)
 	}
 	auth := FDSAuth{
 		UrlBase:      url,
@@ -432,20 +580,139 @@ func (c *FDSClient) Get_Object_Reader(bucketname, objectname string, position in
 		return nil, Model.NewFDSError(string(body), res.StatusCode)
 	}
 }
+
+//name:
+//     Download_Object
+//     将指定的object下载到本地文件，并不会判断本地是否存在同名文件，如果存在同名文件则文件内容会被重写，文件inode可能并不会改变,因为文件
+//param:
+//     bucketname: 使用的bucket的名字
+//     objectname: 要下载的object的名字
+//     filename:   本地要写入的文件名字
+//return:
+//     *string: 返回服务器端该文件的md5值，用户校验本地文件是否完整
+//     error: 正常返回nil，异常返回error Code
+//example:
+//     Not available now
+func (c *FDSClient) Download_Object(bucketname, objectname, filename string) (*string, error) {
+	if _, err := os.Stat(filename); os.IsExist(err) {
+		return nil, Model.NewFDSError("File exists", -1)
+	}
+
+	file, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0600)
+	defer file.Close()
+
+	bufferdWriter := bufio.NewWriter(file)
+
+	meta, err := c.Get_Object_Meta(bucketname, objectname)
+	if err != nil {
+		return nil, Model.NewFDSError(err.Error(), -1)
+	}
+	contentLength, err := meta.GetMetadataContentLength()
+	if err != nil {
+		return nil, Model.NewFDSError(err.Error(), -1)
+	}
+	slices := int64(math.Ceil(float64(contentLength / SLICE_SIZE)))
+	md5sum, err := meta.GetContentMD5()
+	if err != nil {
+		return nil, Model.NewFDSError(err.Error(), -1)
+	}
+
+	// log.Printf("contentLength %d\n", contentLength)
+	// log.Printf("Slices %d\n", slices)
+
+	url := c.GetBaseUri() + bucketname + DELIMITER + objectname
+	headers := map[string]string{}
+	auth := FDSAuth{
+		UrlBase:      url,
+		Method:       "GET",
+		Data:         nil,
+		Content_Md5:  "",
+		Content_Type: "",
+		Headers:      &headers,
+	}
+	var i int64 = 0
+	// 如果要下载的文件大于50MB，则按照每个50MB分段下载，最后一个分片可以小于50MB
+	for ; i < slices; i++ {
+		var partSize int64
+		partStartPosition := SLICE_SIZE * i
+		if (i + 1) == slices {
+			partSize = contentLength - i*SLICE_SIZE
+		} else {
+			partSize = SLICE_SIZE
+		}
+		headers["range"] = fmt.Sprintf("bytes=%d-%d", partStartPosition, partStartPosition+partSize-1)
+		res, err := c.Auth(auth)
+		if err != nil {
+			return nil, Model.NewFDSError(err.Error(), -1)
+		}
+		body, err := ioutil.ReadAll(res.Body)
+		res.Body.Close()
+		if err != nil {
+			return nil, Model.NewFDSError(err.Error(), -1)
+		}
+		if res.StatusCode == http.StatusOK || res.StatusCode == http.StatusPartialContent {
+			bufferdWriter.Write(body)
+		} else {
+			return nil, Model.NewFDSError(string(body), res.StatusCode)
+		}
+		bufferdWriter.Flush()
+	}
+	return &md5sum, nil
+}
+
+//name:
+//     Uri_To_Bucket_And_Object
+//     将指定Uri转换成bucketname和objectname
+//param:
+//     url: 要下载的object的uri地址，格式为：fds://bucketname/objectname
+//return:
+//     string: bucket name
+//     string: object name
+//example:
+//     Not available now
+func Uri_To_Bucket_And_Object(uri string) (string, string) {
+	if !strings.HasPrefix(uri, "fds://") {
+		return "", ""
+	}
+	bucketObjectPair := strings.Split(uri[6:], "/")
+	if len(bucketObjectPair) >= 2 {
+		bucketName := bucketObjectPair[0]
+		objectName := bucketObjectPair[1]
+		return bucketName, objectName
+	}
+	return "", ""
+}
+
+//name:
+//     Download_Object_With_Uri
+//     将指定Uri的object下载到本地文件，并不会判断本地是否存在同名文件，如果存在同名文件则文件内容会被重写，文件inode可能并不会改变,因为文件
+//param:
+//     url: 要下载的object的uri地址，格式为：fds://bucketname/objectname
+//     filename:   本地要写入的文件名字
+//return:
+//     string: bucketname
+//     string: objectname
+//example:
+//     Not available now
+func (c *FDSClient) Download_Object_With_Uri(url, filename string) (*string, error) {
+	bucketNmme, objectName := Uri_To_Bucket_And_Object(url)
+	return c.Download_Object(bucketNmme, objectName, filename)
+}
+
 // prefix需要改进
 func (c *FDSClient) List_Object(bucketname, prefix, delimiter string, maxKeys int) (*Model.FDSObjectListing, error) {
 	urlStr := c.GetBaseUri() + bucketname
 	auth := FDSAuth{
-		UrlBase:          urlStr,
+		UrlBase:      urlStr,
 		Method:       "GET",
 		Data:         nil,
 		Content_Md5:  "",
 		Content_Type: "",
 		Headers:      nil,
-		Params:       &map[string]string{
-			"prefix": prefix,
+		Params: &map[string]string{
+			"prefix":    prefix,
 			"delimiter": delimiter,
-			"maxKeys": strconv.Itoa(maxKeys),
+			"maxKeys":   strconv.Itoa(maxKeys),
 		},
 	}
 	res, err := c.Auth(auth)
@@ -464,21 +731,65 @@ func (c *FDSClient) List_Object(bucketname, prefix, delimiter string, maxKeys in
 	}
 }
 
-func (c* FDSClient) List_Multipart_Uploads(bucketName, prefix,
-delimiter string, maxKeys int) (*Model.FDSListMultipartUploadsResult, error) {
+//name:
+//     List_Trash_Object
+//description:
+//     列出用户配置的AK SK，列出由该AK SK所在org下响应bucket中被删除的object
+//param:
+//     prefix: The prefix of bucket_name/object_name
+//     delimiter: The delimiter used in listing
+//     maxKeys: 每次获取最大的bucket数量
+//return:
+//     *Model.FDSObjectListing: 包含object信息的结构体
+//     error: 正常返回nil，异常返回error Code
+//example:
+//     Not available now
+func (c *FDSClient) List_Trash_Object(prefix, delimiter string, maxKeys int) (*Model.FDSObjectListing, error) {
+	urlStr := c.GetBaseUri() + "trash" //+ "?authorizedObjects"
+	auth := FDSAuth{
+		UrlBase:      urlStr,
+		Method:       "GET",
+		Data:         nil,
+		Content_Md5:  "",
+		Content_Type: "",
+		Headers:      nil,
+		Params: &map[string]string{
+			"prefix":    prefix,
+			"delimiter": delimiter,
+			"maxKeys":   strconv.Itoa(maxKeys),
+		},
+	}
+	res, err := c.Auth(auth)
+	if err != nil {
+		return nil, Model.NewFDSError(err.Error(), -1)
+	}
+	body, err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		return nil, Model.NewFDSError(err.Error(), -1)
+	}
+	if res.StatusCode == 200 {
+		return Model.NewFDSObjectListing(body)
+	} else {
+		return nil, Model.NewFDSError(string(body), res.StatusCode)
+	}
+}
+
+func (c *FDSClient) List_Multipart_Uploads(bucketName, prefix,
+	delimiter string, maxKeys int) (*Model.FDSListMultipartUploadsResult, error) {
 	url := c.GetBaseUri() + bucketName
-	auth := FDSAuth {
+	auth := FDSAuth{
 		UrlBase:      url,
 		Method:       "GET",
 		Data:         nil,
 		Content_Md5:  "",
 		Content_Type: "",
 		Headers:      nil,
-		Params:       &map[string]string {
-			"uploads": "",
-			"prefix": prefix,
+		Params: &map[string]string{
+			"uploads":   "",
+			"prefix":    prefix,
 			"delimiter": delimiter,
-			"maxKeys": strconv.Itoa(maxKeys),
+			"maxKeys":   strconv.Itoa(maxKeys),
 		},
 	}
 	res, err := c.Auth(auth)
@@ -501,7 +812,7 @@ delimiter string, maxKeys int) (*Model.FDSListMultipartUploadsResult, error) {
 	}
 }
 
-func (c* FDSClient) List_Parts(bucketName, objectName, uploadId string) (*Model.UploadPartList, error){
+func (c *FDSClient) List_Parts(bucketName, objectName, uploadId string) (*Model.UploadPartList, error) {
 	url := c.GetBaseUri() + bucketName + DELIMITER + objectName
 	headers := map[string]string{}
 	auth := FDSAuth{
@@ -511,7 +822,7 @@ func (c* FDSClient) List_Parts(bucketName, objectName, uploadId string) (*Model.
 		Content_Md5:  "",
 		Content_Type: "",
 		Headers:      &headers,
-		Params:       &map[string]string {
+		Params: &map[string]string{
 			"uploadId": uploadId,
 		},
 	}
@@ -549,11 +860,11 @@ func (c *FDSClient) List_Next_Batch_Of_Objects(previous *Model.FDSObjectListing)
 		Content_Md5:  "",
 		Content_Type: "",
 		Headers:      nil,
-		Params:       &map[string]string {
-			"prefix": prefix,
+		Params: &map[string]string{
+			"prefix":    prefix,
 			"delimiter": delimiter,
-			"maxKeys": strconv.Itoa(maxKeys),
-			"marker": marker,
+			"maxKeys":   strconv.Itoa(maxKeys),
+			"marker":    marker,
 		},
 	}
 	res, err := c.Auth(auth)
@@ -572,7 +883,7 @@ func (c *FDSClient) List_Next_Batch_Of_Objects(previous *Model.FDSObjectListing)
 	}
 }
 
-// v1类型
+// v1类型：objectname由服务端随机生成唯一名字
 func (c *FDSClient) Post_Object(bucketname string, data []byte, filetype string) (string, error) {
 	url := c.GetBaseUri() + bucketname + DELIMITER
 	if !strings.HasPrefix(filetype, ".") {
@@ -583,7 +894,7 @@ func (c *FDSClient) Post_Object(bucketname string, data []byte, filetype string)
 		content_type = "application/octet-stream"
 	}
 	auth := FDSAuth{
-		UrlBase:          url,
+		UrlBase:      url,
 		Method:       "POST",
 		Data:         data,
 		Content_Md5:  "",
@@ -621,8 +932,8 @@ func (c *FDSClient) Post_Object(bucketname string, data []byte, filetype string)
 
 // v2类型  自定义文件名 如果object已存在，将会覆盖
 func (c *FDSClient) Put_Object(bucketname string, objectname string,
-                               data []byte, contentType string,
-headers *map[string]string) (*Model.PutObjectResult, error) {
+	data []byte, contentType string,
+	headers *map[string]string) (*Model.PutObjectResult, error) {
 	url := c.GetUploadURL() + bucketname + DELIMITER + objectname
 	if contentType == "" {
 		contentType = "application/octet-stream"
@@ -650,6 +961,26 @@ headers *map[string]string) (*Model.PutObjectResult, error) {
 	} else {
 		return nil, Model.NewFDSError(string(body), res.StatusCode)
 	}
+}
+
+//name:
+//     Put_Object_With_Uri
+//description:
+//     通过用户指定的URI上传object
+//param:
+//     url:         上传object所使用的uri
+//     data:        object内容
+//     contentType: object内容类型
+//     headers:     头信息
+//return:
+//     *Model.PutObjectResult: 上传结果信息
+//     error: 正常返回nil，异常返回error Code
+//example:
+//     Not available now
+func (c *FDSClient) Put_Object_With_Uri(url string, data []byte, contentType string,
+	headers *map[string]string) (*Model.PutObjectResult, error) {
+	bucketName, objectName := Uri_To_Bucket_And_Object(url)
+	return c.Put_Object(bucketName, objectName, data, contentType, headers)
 }
 
 func checkNotEmpty(s string) bool {
@@ -686,10 +1017,11 @@ func (c *FDSClient) Delete_Object(bucketname, objectname string) (bool, error) {
 }
 
 func (c *FDSClient) Rename_Object(bucketname, src_objectname, dst_objectname string) (bool, error) {
+
 	url := c.GetUploadURL() + bucketname + DELIMITER + src_objectname +
 		"?renameTo=" + dst_objectname
 	auth := FDSAuth{
-		UrlBase:          url,
+		UrlBase:      url,
 		Method:       "PUT",
 		Data:         nil,
 		Content_Md5:  "",
@@ -715,7 +1047,7 @@ func (c *FDSClient) Rename_Object(bucketname, src_objectname, dst_objectname str
 func (c *FDSClient) Prefetch_Object(bucketname, objectname string) (bool, error) {
 	url := c.GetUploadURL() + bucketname + DELIMITER + objectname + "?prefetch"
 	auth := FDSAuth{
-		UrlBase:          url,
+		UrlBase:      url,
 		Method:       "PUT",
 		Data:         nil,
 		Content_Md5:  "",
@@ -741,7 +1073,7 @@ func (c *FDSClient) Prefetch_Object(bucketname, objectname string) (bool, error)
 func (c *FDSClient) Refresh_Object(bucketname, objectname string) (bool, error) {
 	url := c.GetUploadURL() + bucketname + DELIMITER + objectname + "?refresh"
 	auth := FDSAuth{
-		UrlBase:          url,
+		UrlBase:      url,
 		Method:       "PUT",
 		Data:         nil,
 		Content_Md5:  "",
@@ -771,7 +1103,7 @@ func (c *FDSClient) Set_Object_Acl(bucketname, objectname string, acl map[string
 	jsonString, _ := json.Marshal(acp)
 	url := c.GetUploadURL() + bucketname + DELIMITER + objectname + "?acl"
 	auth := FDSAuth{
-		UrlBase:          url,
+		UrlBase:      url,
 		Method:       "PUT",
 		Data:         jsonString,
 		Content_Md5:  "",
@@ -791,6 +1123,251 @@ func (c *FDSClient) Set_Object_Acl(bucketname, objectname string, acl map[string
 		return true, nil
 	} else {
 		return false, Model.NewFDSError(string(body), res.StatusCode)
+	}
+}
+
+//name:
+//     Set_Object_Acl_New
+//description:
+//     修改指定object的ACL规则
+//param:
+//     bucketname:  要修改ACL的object所在的bucket
+//     objectname:  要修改ACL的object
+//     acl:         要设置的ACL规则
+//return:
+//     bool:  如果执行正常则返回true，发生错误是返回false
+//     error: 正常返回nil，异常返回error Code
+//example:
+//     Not available now
+func (c *FDSClient) Set_Object_Acl_New(bucketname, objectname string, acl Model.ACL) (bool, error) {
+	jsonString, _ := json.Marshal(acl)
+	url := c.GetUploadURL() + bucketname + DELIMITER + objectname + "?acl"
+	auth := FDSAuth{
+		UrlBase:      url,
+		Method:       "PUT",
+		Data:         jsonString,
+		Content_Md5:  "",
+		Content_Type: "",
+		Headers:      nil,
+	}
+	res, err := c.Auth(auth)
+	if err != nil {
+		return false, Model.NewFDSError(err.Error(), -1)
+	}
+	body, err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		return false, Model.NewFDSError(err.Error(), -1)
+	}
+	if res.StatusCode == 200 {
+		return true, nil
+	} else {
+		return false, Model.NewFDSError(string(body), res.StatusCode)
+	}
+}
+
+//name:
+//     Get_Object_ACL
+//description:
+//     获取指定Object的ACL规则
+//param:
+//     bucketname:  要获取ACL的Object所在的bucket
+//     objectname:  要回去ACL的Object
+//return:
+//     *Model.ACL:  获取到ACL结构体
+//     error: 正常返回nil，异常返回error Code
+//example:
+//     Not available now
+func (c *FDSClient) Get_Object_ACL(bucketname, objectname string) (*Model.ACL, error) {
+	url := c.GetUploadURL() + bucketname + DELIMITER + objectname + "?acl"
+	auth := FDSAuth{
+		UrlBase:      url,
+		Method:       "GET",
+		Content_Md5:  "",
+		Content_Type: "",
+		Headers:      nil,
+	}
+	res, err := c.Auth(auth)
+	if err != nil {
+		return nil, Model.NewFDSError(err.Error(), -1)
+	}
+	body, err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		return nil, Model.NewFDSError(err.Error(), -1)
+	}
+	if res.StatusCode == 200 {
+		acl, err := Model.NewACL(body)
+		if err != nil {
+			return nil, nil
+		}
+		return acl, nil
+	} else {
+		return nil, Model.NewFDSError(string(body), res.StatusCode)
+	}
+}
+
+//name:
+//     Delete_Object_ACL
+//description:
+//     删除指定Object的ACL规则
+//param:
+//     bucketname:  要获取ACL的Object所在的bucket
+//     objectname:  要回去ACL的Object
+//     acl:         要删除的ACL
+//return:
+//     bool:  如果执行正常则返回true，发生错误是返回false
+//     error: 正常返回nil，异常返回error Code
+//example:
+//     Not available now
+func (c *FDSClient) Delete_Object_ACL(bucketname, objectname string, acl Model.ACL) (bool, error) {
+	jsonString, _ := json.Marshal(acl)
+	url := c.GetUploadURL() + bucketname + DELIMITER + objectname + "?acl"
+	auth := FDSAuth{
+		UrlBase:      url,
+		Method:       "PUT",
+		Data:         jsonString,
+		Content_Md5:  "",
+		Content_Type: "",
+		Headers:      nil,
+		Params: &map[string]string{
+			"action": "delete",
+		},
+	}
+	res, err := c.Auth(auth)
+	if err != nil {
+		return false, Model.NewFDSError(err.Error(), -1)
+	}
+	body, err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		return false, Model.NewFDSError(err.Error(), -1)
+	}
+	if res.StatusCode == 200 {
+		return true, nil
+	} else {
+		return false, Model.NewFDSError(string(body), res.StatusCode)
+	}
+}
+
+//name:
+//     Set_Bucket_ACL
+//description:
+//     设置指定bucket的ACL规则
+//param:
+//     bucketname:  要修改ACL规则的bucket
+//     acl:         ACL规则
+//return:
+//     bool:  如果执行正常则返回true，发生错误是返回false
+//     error: 正常返回nil，异常返回error Code
+//example:
+//     Not available now
+func (c *FDSClient) Set_Bucket_ACL(bucketname string, acl Model.ACL) (bool, error) {
+	jsonString, _ := json.Marshal(acl)
+	url := c.GetUploadURL() + bucketname + "?acl"
+	auth := FDSAuth{
+		UrlBase:      url,
+		Method:       "PUT",
+		Data:         jsonString,
+		Content_Md5:  "",
+		Content_Type: "",
+		Headers:      nil,
+	}
+	res, err := c.Auth(auth)
+	if err != nil {
+		return false, Model.NewFDSError(err.Error(), -1)
+	}
+	body, err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		return false, Model.NewFDSError(err.Error(), -1)
+	}
+	if res.StatusCode == 200 {
+		return true, nil
+	} else {
+		return false, Model.NewFDSError(string(body), res.StatusCode)
+	}
+}
+
+//name:
+//     Delete_Bucket_ACL
+//description:
+//     删除指定bucket的ACL规则
+//param:
+//     bucketname:  要删除ACL的bucket
+//     acl:         要删除的ACL
+//return:
+//     bool:  如果执行正常则返回true，发生错误是返回false
+//     error: 正常返回nil，异常返回error Code
+//example:
+//     Not available now
+func (c *FDSClient) Delete_Bucket_ACL(bucketname string, acl Model.ACL) (bool, error) {
+	jsonString, _ := json.Marshal(acl)
+	url := c.GetUploadURL() + bucketname + "?acl"
+	auth := FDSAuth{
+		UrlBase:      url,
+		Method:       "PUT",
+		Data:         jsonString,
+		Content_Md5:  "",
+		Content_Type: "",
+		Headers:      nil,
+		Params: &map[string]string{
+			"action": "delete",
+		},
+	}
+	res, err := c.Auth(auth)
+	if err != nil {
+		return false, Model.NewFDSError(err.Error(), -1)
+	}
+	body, err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		return false, Model.NewFDSError(err.Error(), -1)
+	}
+	if res.StatusCode == 200 {
+		return true, nil
+	} else {
+		return false, Model.NewFDSError(string(body), res.StatusCode)
+	}
+}
+
+//name:
+//     Get_Bucket_ACL
+//description:
+//     获取指定bucket的ACL规则
+//param:
+//     bucketname:  要获取ACL的bucket
+//return:
+//     bool:  如果执行正常则返回true，发生错误是返回false
+//     error: 正常返回nil，异常返回error Code
+//example:
+//     Not available now
+func (c *FDSClient) Get_Bucket_ACL(bucketname string) (*Model.ACL, error) {
+	url := c.GetUploadURL() + bucketname + "?acl"
+	auth := FDSAuth{
+		UrlBase:      url,
+		Method:       "GET",
+		Content_Md5:  "",
+		Content_Type: "",
+		Headers:      nil,
+	}
+	res, err := c.Auth(auth)
+	if err != nil {
+		return nil, Model.NewFDSError(err.Error(), -1)
+	}
+	body, err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		return nil, Model.NewFDSError(err.Error(), -1)
+	}
+	if res.StatusCode == 200 {
+		acl, err := Model.NewACL(body)
+		if err != nil {
+			return nil, nil
+		}
+		return acl, nil
+	} else {
+		return nil, Model.NewFDSError(string(body), res.StatusCode)
 	}
 }
 
@@ -830,7 +1407,7 @@ func (c *FDSClient) Init_MultiPart_Upload(bucketname, objectname string, content
 		Content_Md5:  md5sum,
 		Content_Type: contentType,
 		Headers:      &map[string]string{"x-xiaomi-estimated-object-size": "1000000000"},
-		Params:       &map[string]string {
+		Params: &map[string]string{
 			"uploads": "",
 		},
 	}
@@ -853,16 +1430,16 @@ func (c *FDSClient) Init_MultiPart_Upload(bucketname, objectname string, content
 func (c *FDSClient) Upload_Part(initUploadPartResult *Model.InitMultipartUploadResult, partnumber int, data []byte) (*Model.UploadPartResult, error) {
 	bucketname := initUploadPartResult.BucketName
 	objectname := initUploadPartResult.ObjectName
-	uploadId   := initUploadPartResult.UploadId
+	uploadId := initUploadPartResult.UploadId
 	url := c.GetUploadURL() + bucketname + DELIMITER + objectname
 	auth := FDSAuth{
-		UrlBase:      url,
-		Method:       "PUT",
-		Data:         data,
-		Content_Md5:  "",
-		Headers:      nil,
-		Params:       &map[string]string {
-			"uploadId": uploadId,
+		UrlBase:     url,
+		Method:      "PUT",
+		Data:        data,
+		Content_Md5: "",
+		Headers:     nil,
+		Params: &map[string]string{
+			"uploadId":   uploadId,
 			"partNumber": strconv.Itoa(partnumber),
 		},
 	}
@@ -883,7 +1460,7 @@ func (c *FDSClient) Upload_Part(initUploadPartResult *Model.InitMultipartUploadR
 }
 
 func (c *FDSClient) Complete_Multipart_Upload(initPartuploadResult *Model.InitMultipartUploadResult,
-uploadPartResultList *Model.UploadPartList) (*Model.PutObjectResult, error) {
+	uploadPartResultList *Model.UploadPartList) (*Model.PutObjectResult, error) {
 	bucketName := initPartuploadResult.BucketName
 	objectName := initPartuploadResult.ObjectName
 	uploadId := initPartuploadResult.UploadId
@@ -893,12 +1470,12 @@ uploadPartResultList *Model.UploadPartList) (*Model.PutObjectResult, error) {
 		return nil, Model.NewFDSError(err.Error(), -1)
 	}
 	auth := FDSAuth{
-		UrlBase:          url,
-		Method:       "PUT",
-		Data:         uploadPartResultListByteArray,
-		Content_Md5:  "",
-		Headers:      nil,
-		Params:       &map[string]string {
+		UrlBase:     url,
+		Method:      "PUT",
+		Data:        uploadPartResultListByteArray,
+		Content_Md5: "",
+		Headers:     nil,
+		Params: &map[string]string{
 			"uploadId": uploadId,
 		},
 	}
@@ -917,19 +1494,18 @@ uploadPartResultList *Model.UploadPartList) (*Model.PutObjectResult, error) {
 	return Model.NewPutObjectResult(body)
 }
 
-
 func (c *FDSClient) Abort_MultipartUpload(initPartuploadResult *Model.InitMultipartUploadResult) error {
 	bucketName := initPartuploadResult.BucketName
 	objectName := initPartuploadResult.ObjectName
 	uploadId := initPartuploadResult.UploadId
 	url := c.GetUploadURL() + bucketName + DELIMITER + objectName
 	auth := FDSAuth{
-		UrlBase:      url,
-		Method:       "DELETE",
-		Data:         nil,
-		Content_Md5:  "",
-		Headers:      nil,
-		Params:       &map[string]string {
+		UrlBase:     url,
+		Method:      "DELETE",
+		Data:        nil,
+		Content_Md5: "",
+		Headers:     nil,
+		Params: &map[string]string{
 			"uploadId": uploadId,
 		},
 	}
@@ -950,13 +1526,13 @@ func (c *FDSClient) Abort_MultipartUpload(initPartuploadResult *Model.InitMultip
 
 func (c *FDSClient) Get_Object_Meta(bucketname, objectname string) (*Model.FDSMetaData, error) {
 	url := c.GetBaseUri() + bucketname +
-	DELIMITER + objectname + "?metadata"
+		DELIMITER + objectname + "?metadata"
 	auth := FDSAuth{
-		UrlBase:          url,
-		Method:       "GET",
-		Data:         nil,
-		Content_Md5:  "",
-		Headers:      nil,
+		UrlBase:     url,
+		Method:      "GET",
+		Data:        nil,
+		Content_Md5: "",
+		Headers:     nil,
 	}
 	res, err := c.Auth(auth)
 	if err != nil {
@@ -974,9 +1550,9 @@ func (c *FDSClient) Get_Object_Meta(bucketname, objectname string) (*Model.FDSMe
 }
 
 func (c *FDSClient) Generate_Presigned_URI(bucketname, objectname, method string,
-expiration int64, headers map[string][]string) (string, error) {
+	expiration int64, headers map[string][]string) (string, error) {
 	urlStr := c.GetBaseUri() + bucketname + DELIMITER +
-	objectname
+		objectname
 
 	urlParsed, err := url.Parse(urlStr)
 	if err != nil {
@@ -984,7 +1560,7 @@ expiration int64, headers map[string][]string) (string, error) {
 	}
 	params := url.Values{}
 	if method == "HEAD" {
-		params.Add("metadata", "");
+		params.Add("metadata", "")
 	}
 	params.Add(GALAXY_ACCESS_KEY_ID, c.AppKey)
 	params.Add(EXPIRES, fmt.Sprintf("%d", expiration))
@@ -1006,12 +1582,12 @@ func (c *FDSClient) Delete_Objects(bucketname string, prefix []string) error {
 		return Model.NewFDSError(err.Error(), -1)
 	}
 	auth := FDSAuth{
-		UrlBase:      url,
-		Method:       "PUT",
-		Data:         prefixJson,
-		Content_Md5:  "",
-		Headers:      nil,
-		Params:       &map[string]string {
+		UrlBase:     url,
+		Method:      "PUT",
+		Data:        prefixJson,
+		Content_Md5: "",
+		Headers:     nil,
+		Params: &map[string]string{
 			"deleteObjects": "",
 		},
 	}
@@ -1030,6 +1606,46 @@ func (c *FDSClient) Delete_Objects(bucketname string, prefix []string) error {
 	return nil
 }
 
+//name:
+//     Restore_Object
+//description:
+//     恢复指定删除的object
+//param:
+//     bucketname： 被删除object原来所在的bucket
+//     objectname： 被删除的object名字
+//return:
+//     error: 正常返回nil，异常返回error Code
+//example:
+//     Not available now
+// TODO 防止restore时替换掉原来的Object的冲突检测
+func (c *FDSClient) Restore_Object(bucketname, objectname string) error {
+	url := c.GetBaseUri() + bucketname + "/" + objectname
+
+	auth := FDSAuth{
+		UrlBase:     url,
+		Method:      "PUT",
+		Content_Md5: "",
+		Headers:     nil,
+		Params: &map[string]string{
+			"restore": "",
+		},
+	}
+
+	res, err := c.Auth(auth)
+	if err != nil {
+		return Model.NewFDSError(err.Error(), -1)
+	}
+	body, err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		return Model.NewFDSError(err.Error(), -1)
+	}
+	if res.StatusCode != 200 {
+		return Model.NewFDSError(string(body), -1)
+	}
+	return nil
+}
+
 func (c *FDSClient) Delete_Objects_With_Prefix(bucketname, prefix string) error {
 	listObjectResult, err := c.List_Object(bucketname, prefix, "", DEFAULT_LIST_MAX_KEYS)
 	if err != nil {
@@ -1038,7 +1654,7 @@ func (c *FDSClient) Delete_Objects_With_Prefix(bucketname, prefix string) error 
 
 	for true {
 		prefixArray := []string{}
-		for _, k := range(listObjectResult.ObjectSummaries) {
+		for _, k := range listObjectResult.ObjectSummaries {
 			prefixArray = append(prefixArray, k.ObjectName)
 		}
 
@@ -1059,11 +1675,20 @@ func (c *FDSClient) Delete_Objects_With_Prefix(bucketname, prefix string) error 
 	return nil
 }
 
+//name:
+//     Generate_Download_Object_Uri
+//description:
+//     生成object的下载链接
+//param:
+//     bucketname： 要生成链接的object原来所在的bucket
+//     objectname： 要生成链接的object名字
+//return:
+//     string: 返回指定object的下载地址
+//example:
+//     Not available now
+func (c *FDSClient) Generate_Download_Object_Uri(bucketname, objectname string) string {
+	return c.GetBaseUri() + bucketname + DELIMITER + objectname
+}
+
 // list_object_next
-// set_bucket_acl
-// get_bucket_acl
-// get_object_acl
 // generate_presigned_uri
-// generate_download_object_uri
-
-

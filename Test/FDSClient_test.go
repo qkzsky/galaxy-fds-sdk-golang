@@ -1,26 +1,26 @@
 package Test
 
 import (
-	"testing"
-	"github.com/XiaoMi/galaxy-fds-sdk-golang"
 	"bytes"
-	"runtime"
-	"time"
-	"github.com/XiaoMi/galaxy-fds-sdk-golang/Model"
 	"fmt"
-	"strings"
-	"os"
-	"net/http"
+	"github.com/XiaoMi/galaxy-fds-sdk-golang"
+	"github.com/XiaoMi/galaxy-fds-sdk-golang/Model"
 	"io/ioutil"
+	"net/http"
+	"os"
+	"runtime"
 	"strconv"
+	"strings"
+	"testing"
+	"time"
 )
 
 const (
-	APP_KEY = "APP_KEY"
-	SECRET_KEY = "SECRET_KEY"
+	APP_KEY     = "APP_KEY"
+	SECRET_KEY  = "SECRET_KEY"
 	BUCKET_NAME = "go-lang-test"
-	REGION_NAME = ""
-	ENDPOINT = "cnbj0"
+	REGION_NAME = "cnbj0"
+	ENDPOINT    = "" // fds domain
 )
 
 func getObjectName4test() string {
@@ -36,12 +36,12 @@ func Test_Put_Get_Object(t *testing.T) {
 	content := []byte("blah" + time.Now().Format(time.ANSIC))
 	_, err := client.Put_Object(BUCKET_NAME, objectName, content, "", nil)
 	if err != nil {
-		t.Error("Fail to put object: "  + objectName, err)
+		t.Error("Fail to put object: "+objectName, err)
 	}
 
 	fdsobject, err := client.Get_Object(BUCKET_NAME, objectName, 0, -1)
 	if err != nil {
-		t.Error("Fail to get object: " + objectName, err)
+		t.Error("Fail to get object: "+objectName, err)
 	}
 
 	if !bytes.Equal(content, fdsobject.ObjectContent) {
@@ -58,16 +58,16 @@ func Test_MultiPartUpload(t *testing.T) {
 	}
 
 	var content [3][]byte
-	content[0] = make([]byte, 77777)
-	content[1] = make([]byte, 77777)
+	content[0] = make([]byte, 5242880)
+	content[1] = make([]byte, 5242880)
 	content[2] = make([]byte, 77777)
 
 	var uploadPartList Model.UploadPartList
-	for i, _ := range(content) {
-		for j, _ := range(content[i]) {
+	for i, _ := range content {
+		for j, _ := range content[i] {
 			content[i][j] = byte((i * j) ^ (i + j) - 7)
 		}
-		uploadPartResult, err := client.Upload_Part(initMultiPartResult, i + 1, content[i])
+		uploadPartResult, err := client.Upload_Part(initMultiPartResult, i+1, content[i])
 		if err != nil {
 			t.Error(fmt.Sprintf("Fail to upload part: %d", i))
 		}
@@ -85,7 +85,7 @@ func Test_MultiPartUpload(t *testing.T) {
 
 	fdsobject, err := client.Get_Object(BUCKET_NAME, objectName, 0, -1)
 	if err != nil {
-		t.Error("Fail to get object " + objectName, err)
+		t.Error("Fail to get object "+objectName, err)
 	}
 	allContent := content[0]
 	allContent = append(allContent, content[1]...)
@@ -117,14 +117,14 @@ func Test_MultiPartUpload(t *testing.T) {
 
 func Test_ListObjects(t *testing.T) {
 	objectName := []string{
-	"aaa/bbb/ccc/file1",
-	"aaa/bbb/ccc/file2",
-	"aaa/ddd/file3",
-	"aaa/ddd/file4",
-	"aaa/eee"}
+		"aaa/bbb/ccc/file1",
+		"aaa/bbb/ccc/file2",
+		"aaa/ddd/file3",
+		"aaa/ddd/file4",
+		"aaa/eee"}
 	objectContent := []byte("blah")
 
-	for _, name := range(objectName) {
+	for _, name := range objectName {
 		client.Put_Object(BUCKET_NAME, name, objectContent, "", nil)
 	}
 
@@ -154,7 +154,7 @@ func Test_ListObjects(t *testing.T) {
 	}
 
 	if strings.Compare(listObjectResult.CommonPrefixes[0], "aaa/bbb/") != 0 ||
-	strings.Compare(listObjectResult.CommonPrefixes[1], "aaa/ddd/") != 0 {
+		strings.Compare(listObjectResult.CommonPrefixes[1], "aaa/ddd/") != 0 {
 		t.Error("List result not correct")
 	}
 
@@ -174,7 +174,7 @@ func Test_ListObjects(t *testing.T) {
 
 }
 
-func Test_DeleteObject (t *testing.T) {
+func Test_DeleteObject(t *testing.T) {
 	objectName := getObjectName4test()
 	objectContent := "blah"
 
@@ -194,39 +194,39 @@ func Test_DeleteObject (t *testing.T) {
 
 	_, err = client.Delete_Object(BUCKET_NAME, objectName)
 	if err != nil {
-		t.Error("Fail to delete object: " + objectName, err)
+		t.Error("Fail to delete object: "+objectName, err)
 	}
 
 	exists, err = client.Is_Object_Exists(BUCKET_NAME, objectName)
 	if err != nil {
-		t.Error("Fail to list object" + objectName, err)
+		t.Error("Fail to list object"+objectName, err)
 	}
 	if exists {
 		t.Error("Deleted object still exists")
 	}
 }
 
-func Test_Metadata (t *testing.T) {
+func Test_Metadata(t *testing.T) {
 	objectName := getObjectName4test()
 	objectContent := "blah"
 	contentType := "xxx/yyy"
 	xiaomiMetaData := "x-xiaomi-meta-kakaka"
 
-	headers := map[string]string {
+	headers := map[string]string{
 		xiaomiMetaData: "I used to roll the dice",
-		"wawawa": "see the fear in my enemies' eyes",
+		"wawawa":       "see the fear in my enemies' eyes",
 	}
 
 	_, err := client.Put_Object(BUCKET_NAME, objectName, []byte(objectContent),
 		contentType,
 		&headers)
 	if err != nil {
-		t.Error("Fail to put object: " + objectName, err)
+		t.Error("Fail to put object: "+objectName, err)
 	}
 
 	metadataGot, err := client.Get_Object_Meta(BUCKET_NAME, objectName)
 	if err != nil {
-		t.Error("Fail to get object meta for object: " + objectName, err)
+		t.Error("Fail to get object meta for object: "+objectName, err)
 	}
 
 	contentTypeGot, err := metadataGot.GetContentType()
@@ -235,12 +235,12 @@ func Test_Metadata (t *testing.T) {
 	}
 
 	if strings.Compare(contentTypeGot, contentType) != 0 {
-		t.Error("wrong content type, expect: " + contentType + " got: " + contentTypeGot, err)
+		t.Error("wrong content type, expect: "+contentType+" got: "+contentTypeGot, err)
 	}
 
 	h, err := metadataGot.GetKey(xiaomiMetaData)
 	if err != nil {
-		t.Error(xiaomiMetaData + " no exists", err)
+		t.Error(xiaomiMetaData+" no exists", err)
 	}
 
 	if strings.Compare(h, headers[xiaomiMetaData]) != 0 {
@@ -260,7 +260,7 @@ func Test_Presigned_Url(t *testing.T) {
 	url, err := client.Generate_Presigned_URI(BUCKET_NAME,
 		objectName,
 		"PUT",
-		(time.Now().Add(time.Minute * 5)).UnixNano() / int64(time.Millisecond),
+		(time.Now().Add(time.Minute*5)).UnixNano()/int64(time.Millisecond),
 		map[string][]string{
 			"content-type": []string{contentType},
 		})
@@ -289,7 +289,7 @@ func Test_Presigned_Url(t *testing.T) {
 	url, err = client.Generate_Presigned_URI(BUCKET_NAME,
 		objectName,
 		"GET",
-		time.Now().Add(time.Minute * 5).UnixNano() / int64(time.Millisecond),
+		time.Now().Add(time.Minute*5).UnixNano()/int64(time.Millisecond),
 		map[string][]string{})
 
 	if err != nil {
@@ -316,7 +316,7 @@ func Test_Presigned_Url(t *testing.T) {
 
 	url, err = client.Generate_Presigned_URI(BUCKET_NAME, objectName,
 		"HEAD",
-		time.Now().Add(time.Minute * 5).UnixNano() / int64(time.Millisecond),
+		time.Now().Add(time.Minute*5).UnixNano()/int64(time.Millisecond),
 		map[string][]string{})
 
 	req, err = http.NewRequest("HEAD", url, nil)
@@ -332,11 +332,10 @@ func Test_Presigned_Url(t *testing.T) {
 	fmt.Printf("%v\n", res.Header)
 
 	contentLength, err := strconv.Atoi(res.Header.Get("content-length"))
-	if (contentLength != len(objectContent)) {
+	if contentLength != len(objectContent) {
 		t.Error(fmt.Sprintf("content length check fail, expect: %d, got: %d", len(objectContent), contentLength))
 	}
 }
-
 
 func Test_List_Multipart_uploads(t *testing.T) {
 	objectName := getObjectName4test()
@@ -359,7 +358,7 @@ func Test_List_Multipart_uploads(t *testing.T) {
 	}
 
 	if len(listResult.Uploads) != 1 {
-		t.Error("multi part number, expcet: 1, got: " + strconv.Itoa(len(listResult.Uploads)) )
+		t.Error("multi part number, expcet: 1, got: " + strconv.Itoa(len(listResult.Uploads)))
 	}
 
 	if strings.Compare(initResult.UploadId, listResult.Uploads[0].UploadId) != 0 {
@@ -376,7 +375,7 @@ func Test_List_Multipart_uploads(t *testing.T) {
 	}
 	if listParts.UploadPartResultList[0].PartNumber != partNumber {
 		t.Error("Expcet part Number: " + strconv.Itoa(partNumber) + " got: " +
-		strconv.Itoa(listParts.UploadPartResultList[0].PartNumber))
+			strconv.Itoa(listParts.UploadPartResultList[0].PartNumber))
 	}
 	if int(listParts.UploadPartResultList[0].PartSize) != len(objectContent) {
 		t.Error("Expect part size: " + strconv.Itoa(len(objectContent)) + " got: " + fmt.Sprintf("%d", listParts.UploadPartResultList[0].PartSize))
@@ -387,7 +386,7 @@ func clearOneBucket(client *galaxy_fds_sdk_golang.FDSClient) {
 	client.Delete_Objects_With_Prefix(BUCKET_NAME, "")
 }
 
-func setUpTest () {
+func setUpTest() {
 	exists, err := client.Is_Bucket_Exists(BUCKET_NAME)
 	if err != nil {
 		if exists {
@@ -402,11 +401,10 @@ func tearDown() {
 	clearOneBucket(client)
 }
 
-
 func TestMain(m *testing.M) {
 	client = galaxy_fds_sdk_golang.NEWFDSClient(APP_KEY, SECRET_KEY,
 		REGION_NAME,
-                ENDPOINT,
+		ENDPOINT,
 		false, false)
 	setUpTest()
 	r := m.Run()

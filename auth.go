@@ -1,14 +1,14 @@
 package galaxy_fds_sdk_golang
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/base64"
-	"net/url"
-	"strings"
-	"sort"
-	"bytes"
 	"github.com/XiaoMi/galaxy-fds-sdk-golang/Model"
+	"net/url"
+	"sort"
+	"strings"
 )
 
 func getDateFromUrl(urlStr string) string {
@@ -16,7 +16,7 @@ func getDateFromUrl(urlStr string) string {
 	if err != nil {
 		return ""
 	}
-	queryParams:= urlParsed.Query()
+	queryParams := urlParsed.Query()
 	d, ok := queryParams["Expires"]
 
 	if !ok || len(d) == 0 {
@@ -25,7 +25,7 @@ func getDateFromUrl(urlStr string) string {
 	return d[0]
 }
 
-func getStrFromHeader (headers map[string][]string, key string) string {
+func getStrFromHeader(headers map[string][]string, key string) string {
 	a, ok := headers[key]
 	if !ok {
 		for k, v := range headers {
@@ -50,7 +50,7 @@ func canonicalizeXiaomiHeaders(headers map[string][]string) ([]byte, error) {
 
 	klist := []string{}
 	fileredMap := map[string]string{}
-	for k, v := range(headers) {
+	for k, v := range headers {
 		key := strings.ToLower(k)
 		if !strings.HasPrefix(key, "x-xiaomi-") {
 			continue
@@ -62,7 +62,7 @@ func canonicalizeXiaomiHeaders(headers map[string][]string) ([]byte, error) {
 	sort.Strings(klist)
 
 	var r bytes.Buffer
-	for _, k := range(klist) {
+	for _, k := range klist {
 		r.WriteString(k)
 		r.WriteString(":")
 		r.WriteString(fileredMap[k])
@@ -72,15 +72,15 @@ func canonicalizeXiaomiHeaders(headers map[string][]string) ([]byte, error) {
 	return r.Bytes(), nil
 }
 
-var SUB_RESOURCE_MAP = map[string]string {
-	 "acl": "",
-	 "quota": "",
-	 "uploads": "",
-	 "partNumber": "",
-	 "uploadId": "",
-	 "storageAccessToken": "",
-	 "metadata": "",
- }
+var SUB_RESOURCE_MAP = map[string]string{
+	"acl":                "",
+	"quota":              "",
+	"uploads":            "",
+	"partNumber":         "",
+	"uploadId":           "",
+	"storageAccessToken": "",
+	"metadata":           "",
+}
 
 func canonicalizeResource(uri string) ([]byte, error) {
 	uriParsed, err := url.Parse(uri)
@@ -93,7 +93,7 @@ func canonicalizeResource(uri string) ([]byte, error) {
 	param := uriParsed.Query()
 	filteredKey := []string{}
 	filteredMap := map[string]string{}
-	for k, v := range(param) {
+	for k, v := range param {
 		_, ok := SUB_RESOURCE_MAP[k]
 		if !ok {
 			continue
@@ -112,14 +112,14 @@ func canonicalizeResource(uri string) ([]byte, error) {
 
 	sort.Strings(filteredKey)
 
-	for i, k := range(filteredKey) {
+	for i, k := range filteredKey {
 		if i == 0 {
 			path.WriteString("?")
 		} else {
 			path.WriteString("&")
 		}
 		path.WriteString(k)
-		if (len(filteredMap[k]) > 0) {
+		if len(filteredMap[k]) > 0 {
 			path.WriteString("=")
 			path.WriteString(filteredMap[k])
 		}
@@ -147,17 +147,17 @@ func Signature(app_secret, method, u string, headers map[string][]string) (strin
 	string_to_sign.WriteString("\n")
 
 	/*
-	url_str, _ := url.ParseRequestURI(u)
-	if strings.Contains(url_str.RequestURI(), "?") {
-		uri_list := strings.Split(url_str.RequestURI(), "?")
-		if uri_list[1] != "acl" {
-			uri = uri_list[0]
+		url_str, _ := url.ParseRequestURI(u)
+		if strings.Contains(url_str.RequestURI(), "?") {
+			uri_list := strings.Split(url_str.RequestURI(), "?")
+			if uri_list[1] != "acl" {
+				uri = uri_list[0]
+			} else {
+				uri = url_str.RequestURI()
+			}
 		} else {
 			uri = url_str.RequestURI()
-		}
-	} else {
-		uri = url_str.RequestURI()
-	}*/
+		}*/
 	ch, err := canonicalizeXiaomiHeaders(headers)
 	if err != nil {
 		return "", Model.NewFDSError(err.Error(), -1)

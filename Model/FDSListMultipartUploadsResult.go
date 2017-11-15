@@ -3,16 +3,16 @@ package Model
 import "encoding/json"
 
 type FDSListMultipartUploadsResult struct {
-	BucketName string
-	Prefix string
-	MaxKeys int
-	Marker string
-	IsTruncated bool
-	NextMarker string
-	Uploads []MultipartUploadResult
+	BucketName     string
+	Prefix         string
+	MaxKeys        int
+	Marker         string
+	IsTruncated    bool
+	NextMarker     string
+	Uploads        []MultipartUploadResult
 	CommonPrefixes []string
-	Delimiter string
-	rawJsonValue []byte
+	Delimiter      string
+	rawJsonValue   []byte
 }
 
 func NewFDSListMultipartUploadsResult(jsonValue []byte) (*FDSListMultipartUploadsResult, error) {
@@ -26,7 +26,7 @@ func NewFDSListMultipartUploadsResult(jsonValue []byte) (*FDSListMultipartUpload
 }
 
 type MultipartUploadResult struct {
-	ObjectName string
-	UploadId string
+	ObjectName  string
+	UploadId    string
 	UploadParts []string
 }

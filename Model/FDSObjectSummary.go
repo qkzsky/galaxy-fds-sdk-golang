@@ -6,12 +6,12 @@ import (
 )
 
 type FDSObjectSummary struct {
-	Etag       string
-	ObjectName string `json:"name"`
-	Owner      Owner
-	Size       int64
-	LastModified time.Time
-	UploadTime int64
+	Etag         string    `json:"etag"`
+	ObjectName   string    `json:"name"`
+	Owner        Owner     `json:"owner"`
+	Size         int64     `json:"size"`
+	LastModified time.Time `json:"lastModified"`
+	UploadTime   int64     `json:"uploadTime"`
 	rawJsonValue []byte
 }
 

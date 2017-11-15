@@ -1,6 +1,6 @@
 package Model
 
 type Owner struct {
-	Id string
-	DisplayName string
+	Id          string `json:"id"`
+	DisplayName string `json:"displayName"`
 }

@@ -3,13 +3,13 @@ package Model
 import "encoding/json"
 
 type InitMultipartUploadResult struct {
-	BucketName string
-	ObjectName string
-	UploadId   string
+	BucketName   string
+	ObjectName   string
+	UploadId     string
 	rawJsonValue []byte
 }
 
-func NewInitMultipartUploadResult (jsonValue []byte) (*InitMultipartUploadResult, error){
+func NewInitMultipartUploadResult(jsonValue []byte) (*InitMultipartUploadResult, error) {
 
 	var initMultipartUploadResult InitMultipartUploadResult
 	err := json.Unmarshal(jsonValue, &initMultipartUploadResult)
@@ -21,7 +21,7 @@ func NewInitMultipartUploadResult (jsonValue []byte) (*InitMultipartUploadResult
 }
 
 type UploadPartList struct {
-	UploadPartResultList []UploadPartResult
+	UploadPartResultList []UploadPartResult `json:"uploadPartResultList"`
 }
 
 func NewUploadPartList(jsonValue []byte) (*UploadPartList, error) {
@@ -38,9 +38,9 @@ func (u *UploadPartList) AddUploadPartResult(i *UploadPartResult) {
 }
 
 type UploadPartResult struct {
-	PartNumber int
-	Etag       string
-	PartSize   int64
+	PartNumber   int    `json:"partNumber"`
+	Etag         string `json:"etag"`
+	PartSize     int64  `json:"partSize"`
 	rawJsonValue []byte
 }
 

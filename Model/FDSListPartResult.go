@@ -17,6 +17,6 @@ func NewFDSUploadPartResultList(rawJson []byte) (*FDSUploadPartResultList, error
 
 type FDSUploadPartResult struct {
 	PartNumber int
-	Etag string
-	PartSize int64
+	Etag       string
+	PartSize   int64
 }
