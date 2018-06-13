@@ -611,7 +611,7 @@ func (c *FDSClient) Download_Object(bucketname, objectname, filename string) (*s
 	if err != nil {
 		return nil, Model.NewFDSError(err.Error(), -1)
 	}
-	slices := int64(math.Ceil(float64(contentLength / SLICE_SIZE)))
+	slices := int64(math.Ceil(float64(contentLength) / float64(SLICE_SIZE)))
 	md5sum, err := meta.GetContentMD5()
 	if err != nil {
 		return nil, Model.NewFDSError(err.Error(), -1)

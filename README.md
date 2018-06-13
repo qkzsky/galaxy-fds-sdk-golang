@@ -93,3 +93,6 @@ func main() {
 > 1. 修复readme中的example code中的bug
 > 2. 修复 Test/FDSClient_test.go 中的bug
 > 3. 添加Get_Bucket 接口，但是该接口与java中语义不同，请谨慎使用，java中该方法不返回任何值
+
+20180612
+> 1. 修复download中的分片错误，该错误会导致小于50M的文件无法下载
