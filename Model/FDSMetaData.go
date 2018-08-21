@@ -1,6 +1,7 @@
 package Model
 
 import (
+	"encoding/json"
 	"strconv"
 	"strings"
 )
@@ -28,6 +29,23 @@ func NewFDSMetaData(rawValue map[string][]string) *FDSMetaData {
 		fdsMetaData.m[strings.ToLower(k)] = v
 	}
 	return &fdsMetaData
+}
+
+// Serialize will serialize the FDSMetaData to byte slice
+func (d *FDSMetaData) Serialize() ([]byte, error) {
+	x := make(map[string]string)
+	for k, v := range d.m {
+		if len(v) > 0 {
+			x[k] = v[0]
+		}
+	}
+	data := make(map[string]map[string]string)
+	data["rawMeta"] = x
+	res, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+	return res, err
 }
 
 func (d *FDSMetaData) GetKey(k string) (string, error) {

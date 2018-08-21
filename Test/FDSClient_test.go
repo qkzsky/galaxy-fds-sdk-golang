@@ -3,8 +3,6 @@ package Test
 import (
 	"bytes"
 	"fmt"
-	"github.com/XiaoMi/galaxy-fds-sdk-golang"
-	"github.com/XiaoMi/galaxy-fds-sdk-golang/Model"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -13,6 +11,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/XiaoMi/galaxy-fds-sdk-golang"
+	"github.com/XiaoMi/galaxy-fds-sdk-golang/Model"
 )
 
 const (
@@ -169,7 +170,7 @@ func Test_ListObjects(t *testing.T) {
 		t.Error(fmt.Sprintf("There should be one ObjectSummaries, got %d", len(listObjectResult.CommonPrefixes)))
 	}
 	if len(listObjectResult.CommonPrefixes) != 0 {
-		t.Error(fmt.Sprint("There should be no CommonPrefixes, got %d", len(listObjectResult.ObjectSummaries)))
+		t.Error(fmt.Sprintf("There should be no CommonPrefixes, got %d", len(listObjectResult.ObjectSummaries)))
 	}
 
 }

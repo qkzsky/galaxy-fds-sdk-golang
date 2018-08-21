@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/XiaoMi/galaxy-fds-sdk-golang/Model"
 	"io"
 	"io/ioutil"
 	"math"
@@ -18,6 +17,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/XiaoMi/galaxy-fds-sdk-golang/Model"
 )
 
 const (
@@ -1547,6 +1548,41 @@ func (c *FDSClient) Get_Object_Meta(bucketname, objectname string) (*Model.FDSMe
 		return nil, Model.NewFDSError(string(body), res.StatusCode)
 	}
 	return Model.NewFDSMetaData(res.Header), nil
+}
+
+// SetObjectMetadata method will change object's metadata without puting object
+func (c *FDSClient) SetObjectMetadata(bucketname string, objectname string, metadata Model.FDSMetaData) (bool, error) {
+	url := c.GetBaseUri() + bucketname + DELIMITER + objectname + "?setMetaData"
+
+	data, err := metadata.Serialize()
+	if err != nil {
+		return false, Model.NewFDSError(err.Error(), -1)
+	}
+	// md5sum := fmt.Sprintf("%x", md5.Sum(data))
+
+	auth := FDSAuth{
+		UrlBase:      url,
+		Method:       "PUT",
+		Data:         data,
+		Content_Md5:  "",
+		Content_Type: "",
+		Headers:      nil,
+	}
+	res, err := c.Auth(auth)
+	if err != nil {
+		return false, Model.NewFDSError(err.Error(), -1)
+	}
+
+	body, err := ioutil.ReadAll(res.Body)
+	defer res.Body.Close()
+	if err != nil {
+		return false, Model.NewFDSError(err.Error(), -1)
+	}
+	if res.StatusCode == 200 {
+		return true, nil
+	}
+
+	return false, Model.NewFDSError(string(body), res.StatusCode)
 }
 
 func (c *FDSClient) Generate_Presigned_URI(bucketname, objectname, method string,
