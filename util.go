@@ -631,7 +631,7 @@ func (c *FDSClient) Download_Object(bucketname, objectname, filename string) (*s
 		Content_Type: "",
 		Headers:      &headers,
 	}
-	var i int64 = 0
+	var i int64
 	// 如果要下载的文件大于50MB，则按照每个50MB分段下载，最后一个分片可以小于50MB
 	for ; i < slices; i++ {
 		var partSize int64
