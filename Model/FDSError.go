@@ -14,7 +14,7 @@ type FDSError struct {
 }
 
 func (e *FDSError) Error() string {
-	return fmt.Sprintf("%s %s Code: [%d] Msg: ", e.time.Format(time.ANSIC), e.funcName, e.code, e.msg)
+	return fmt.Sprintf("%s %s Code: [%d] Msg: %s", e.time.Format(time.ANSIC), e.funcName, e.code, e.msg)
 }
 
 func (e *FDSError) Code() int {
