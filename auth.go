@@ -5,7 +5,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/base64"
-	"github.com/XiaoMi/galaxy-fds-sdk-golang/Model"
+	"github.com/qkzsky/galaxy-fds-sdk-golang/Model"
 	"net/url"
 	"sort"
 	"strings"

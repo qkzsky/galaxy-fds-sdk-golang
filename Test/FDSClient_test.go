@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/XiaoMi/galaxy-fds-sdk-golang"
-	"github.com/XiaoMi/galaxy-fds-sdk-golang/Model"
+	"github.com/qkzsky/galaxy-fds-sdk-golang"
+	"github.com/qkzsky/galaxy-fds-sdk-golang/Model"
 )
 
 const (

@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/XiaoMi/galaxy-fds-sdk-golang/Model"
+	"github.com/qkzsky/galaxy-fds-sdk-golang/Model"
 )
 
 const (
